@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getDashboardStats,
   getEscalatedIssues,
+  getRootCauseSuggestions,
   scopeForUser,
 } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { PriorityBadge } from "@/components/civic/priority-badge";
 import { EscalationBadge } from "@/components/civic/escalation-badge";
 import { VerifyButton } from "@/components/civic/verify-button";
 import { AuthorityIssueList } from "@/components/civic/authority-issue-list";
+import { RootCauseSuggestionCard } from "@/components/civic/root-cause-suggestion-card";
 import { cn } from "@/lib/utils";
 
 const issueCardSelect = {
@@ -39,24 +41,26 @@ export default async function AuthorityDashboardPage() {
   const isHead = user.role === Role.LOCAL_BODY_HEAD;
   const scope = scopeForUser(user);
 
-  const [stats, escalations, submittedIssues, allIssues] = await Promise.all([
-    getDashboardStats(scope),
-    getEscalatedIssues(scope),
-    isHead
-      ? prisma.issue.findMany({
-          where: { ...scope, status: "SUBMITTED" },
-          orderBy: { communityImpactScore: "desc" },
-          take: 20,
-          select: issueCardSelect,
-        })
-      : Promise.resolve([]),
-    prisma.issue.findMany({
-      where: isHead ? scope : { ...scope, assignedToId: user.id },
-      orderBy: [{ communityImpactScore: "desc" }, { createdAt: "desc" }],
-      take: 50,
-      select: issueCardSelect,
-    }),
-  ]);
+  const [stats, escalations, submittedIssues, allIssues, rootCauseSuggestions] =
+    await Promise.all([
+      getDashboardStats(scope),
+      getEscalatedIssues(scope),
+      isHead
+        ? prisma.issue.findMany({
+            where: { ...scope, status: "SUBMITTED" },
+            orderBy: { communityImpactScore: "desc" },
+            take: 20,
+            select: issueCardSelect,
+          })
+        : Promise.resolve([]),
+      prisma.issue.findMany({
+        where: isHead ? scope : { ...scope, assignedToId: user.id },
+        orderBy: [{ communityImpactScore: "desc" }, { createdAt: "desc" }],
+        take: 50,
+        select: issueCardSelect,
+      }),
+      isHead ? getRootCauseSuggestions(scope) : Promise.resolve([]),
+    ]);
 
   const statCards = [
     { label: "Open Issues", value: stats.open },
@@ -91,6 +95,40 @@ export default async function AuthorityDashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Root cause suggestions — HEAD only, demo-critical */}
+      {isHead && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Root Cause Suggestions
+            </h2>
+            <Badge variant="secondary">{rootCauseSuggestions.length}</Badge>
+          </div>
+          {rootCauseSuggestions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No root cause suggestions at this time.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {rootCauseSuggestions.map((s) => (
+                <RootCauseSuggestionCard
+                  key={s.id}
+                  issueId={s.id}
+                  suggestion={s.aiRootCauseSuggestion ?? ""}
+                  reason={s.aiRootCauseReason ?? ""}
+                  confidence={s.aiRootCauseConfidence ?? 0}
+                  relatedIds={s.aiRootCauseRelatedIds}
+                  category={s.category}
+                  municipalityName={s.municipalityName}
+                  districtName={s.districtName}
+                  provinceName={s.provinceName}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Verification queue — HEAD only */}
       {isHead && (

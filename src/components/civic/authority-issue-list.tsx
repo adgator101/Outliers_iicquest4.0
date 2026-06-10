@@ -86,7 +86,11 @@ export function AuthorityIssueList({
               <IssueCard issue={issue} href={`/authority/issues/${issue.id}`} />
               {isHead && issue.status === "VERIFIED" && (
                 <div className="flex justify-end">
-                  <AssignIssueDialog issueId={issue.id} issueTitle={issue.title} />
+                  <AssignIssueDialog
+                    issueId={issue.id}
+                    issueTitle={issue.title}
+                    issueCategory={issue.category}
+                  />
                 </div>
               )}
             </div>

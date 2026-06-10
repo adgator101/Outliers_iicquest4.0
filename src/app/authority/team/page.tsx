@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Users2, ChevronRight } from "lucide-react";
 import { AddEmployeeDialog } from "@/components/civic/add-employee-dialog";
 import { EmployeeStatusToggle } from "@/components/civic/employee-status-toggle";
+import { SectionHeadToggle } from "@/components/civic/section-head-toggle";
 import { DepartmentBadge } from "@/components/civic/department-badge";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,7 @@ type Employee = {
   email: string;
   department: import("@/generated/prisma/client").Department | null;
   isActive: boolean;
+  isSectionHead: boolean;
   wardNumber: number | null;
 };
 
@@ -88,6 +90,11 @@ function EmployeeRow({ e }: { e: Employee }) {
         {e.isActive ? "Active" : "Inactive"}
       </span>
 
+      <SectionHeadToggle
+        userId={e.id}
+        isSectionHead={e.isSectionHead}
+        hasDepartment={e.department != null}
+      />
       <EmployeeStatusToggle userId={e.id} isActive={e.isActive} />
     </div>
   );
@@ -107,6 +114,7 @@ export default async function TeamPage() {
       email: true,
       department: true,
       isActive: true,
+      isSectionHead: true,
       wardNumber: true,
     },
     orderBy: [{ isActive: "desc" }, { name: "asc" }],

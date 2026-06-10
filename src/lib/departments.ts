@@ -18,6 +18,13 @@ export function categoryToDepartment(category: Category): Department {
   return CATEGORY_TO_DEPARTMENT[category];
 }
 
+// All categories owned by a section — used to build a section head's queue.
+export function categoriesForDepartment(department: Department): Category[] {
+  return (Object.keys(CATEGORY_TO_DEPARTMENT) as Category[]).filter(
+    (c) => CATEGORY_TO_DEPARTMENT[c] === department
+  );
+}
+
 export const DEPARTMENT_LABELS: Record<Department, string> = {
   TECHNICAL_INFRASTRUCTURE: "Technical / Infrastructure",
   WATER_SANITATION: "Water Supply & Sanitation",

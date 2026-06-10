@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { Role, IssueStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeEscalation, formatRelativeTime } from "@/lib/utils";
+import { categoryToDepartment } from "@/lib/departments";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { IssueStatusBadge } from "@/components/civic/issue-status-badge";
@@ -31,6 +32,14 @@ export default async function AuthorityIssueDetailPage({
   const { id } = await params;
   const user = await requireRole([Role.LOCAL_BODY_EMPLOYEE, Role.LOCAL_BODY_HEAD]);
   const isHead = user.role === Role.LOCAL_BODY_HEAD;
+
+  // A section head can assign issues that belong to their section.
+  const me = isHead
+    ? null
+    : await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { isSectionHead: true, department: true },
+      });
 
   const issue = await prisma.issue.findUnique({
     where: { id },
@@ -68,6 +77,11 @@ export default async function AuthorityIssueDetailPage({
     issue.dueDate
   );
   const allowedNext = ALLOWED_NEXT[issue.status] ?? [];
+  const canAssign =
+    issue.status === IssueStatus.VERIFIED &&
+    (isHead ||
+      (!!me?.isSectionHead &&
+        me.department === categoryToDepartment(issue.category)));
   const locationParts = [
     issue.wardNumber ? `Ward ${issue.wardNumber}` : null,
     issue.municipalityName,
@@ -152,8 +166,12 @@ export default async function AuthorityIssueDetailPage({
           ) : (
             <p className="text-sm text-muted-foreground">Not yet assigned.</p>
           )}
-          {isHead && issue.status === IssueStatus.VERIFIED && (
-            <AssignIssueDialog issueId={issue.id} issueTitle={issue.title} />
+          {canAssign && (
+            <AssignIssueDialog
+              issueId={issue.id}
+              issueTitle={issue.title}
+              issueCategory={issue.category}
+            />
           )}
         </div>
 

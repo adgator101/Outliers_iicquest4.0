@@ -25,6 +25,8 @@ import { EscalationBadge } from "@/components/civic/escalation-badge";
 import { VerifyButton } from "@/components/civic/verify-button";
 import { AuthorityIssueList } from "@/components/civic/authority-issue-list";
 import { RootCauseSuggestionCard } from "@/components/civic/root-cause-suggestion-card";
+import { AssignIssueDialog } from "@/components/civic/assign-issue-dialog";
+import { categoriesForDepartment, DEPARTMENT_LABELS } from "@/lib/departments";
 import { cn } from "@/lib/utils";
 
 const issueCardSelect = {
@@ -48,7 +50,17 @@ export default async function AuthorityDashboardPage() {
   const isHead = user.role === Role.LOCAL_BODY_HEAD;
   const scope = scopeForUser(user);
 
-  const [stats, escalations, submittedIssues, allIssues, rootCauseSuggestions] =
+  // Section heads (employees flagged isSectionHead) get a queue of verified issues
+  // for their section to assign within their team.
+  const me = isHead
+    ? null
+    : await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { isSectionHead: true, department: true },
+      });
+  const sectionDept = me?.isSectionHead ? me.department : null;
+
+  const [stats, escalations, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue] =
     await Promise.all([
       getDashboardStats(scope),
       getEscalatedIssues(scope),
@@ -67,6 +79,18 @@ export default async function AuthorityDashboardPage() {
         select: issueCardSelect,
       }),
       isHead ? getRootCauseSuggestions(scope) : Promise.resolve([]),
+      sectionDept
+        ? prisma.issue.findMany({
+            where: {
+              ...scope,
+              status: "VERIFIED",
+              category: { in: categoriesForDepartment(sectionDept) },
+            },
+            orderBy: [{ communityImpactScore: "desc" }, { createdAt: "desc" }],
+            take: 30,
+            select: issueCardSelect,
+          })
+        : Promise.resolve([]),
     ]);
 
   const statCards = [
@@ -102,10 +126,15 @@ export default async function AuthorityDashboardPage() {
       {/* Header */}
       <div className="border-b pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {isHead ? "Municipality Dashboard" : "My Assigned Issues"}
+          {isHead
+            ? "Municipality Dashboard"
+            : sectionDept
+            ? `${DEPARTMENT_LABELS[sectionDept]} — Section`
+            : "My Assigned Issues"}
         </h1>
         <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
           <Building2 className="size-4 shrink-0" />
+          {sectionDept ? "Section head · " : ""}
           {[user.municipalityName, user.districtName, user.provinceName]
             .filter(Boolean)
             .join(" · ") || "Your jurisdiction"}
@@ -135,6 +164,38 @@ export default async function AuthorityDashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Section assignment queue — section heads only */}
+      {sectionDept && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Awaiting Assignment — {DEPARTMENT_LABELS[sectionDept]}
+            </h2>
+            <Badge variant="secondary">{sectionQueue.length}</Badge>
+          </div>
+          {sectionQueue.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing waiting. Verified issues for your section appear here to assign.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sectionQueue.map((issue) => (
+                <div key={issue.id} className="space-y-2">
+                  <IssueCard issue={issue} href={`/authority/issues/${issue.id}`} />
+                  <div className="flex justify-end">
+                    <AssignIssueDialog
+                      issueId={issue.id}
+                      issueTitle={issue.title}
+                      issueCategory={issue.category}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Root cause suggestions — HEAD only, demo-critical */}
       {isHead && (

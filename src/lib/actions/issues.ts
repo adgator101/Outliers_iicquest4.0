@@ -246,3 +246,63 @@ export const setIssueDueDateAction = roleActionClient([Role.LOCAL_BODY_HEAD])
     });
     return { issue };
   });
+
+// STORY-010: HEAD confirms a coordinated fix — resolve open downstream issues
+// that descend from a fixed upstream root. These RESOLVED issues remain
+// disputable by the community (RESOLVED → REOPENED), so a wrong cascade self-corrects.
+export const cascadeResolveAction = roleActionClient([Role.LOCAL_BODY_HEAD])
+  .schema(
+    z.object({
+      upstreamIssueId: z.string().min(1),
+      downstreamIssueIds: z.array(z.string().min(1)).min(1),
+    })
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const head = await prisma.user.findUniqueOrThrow({
+      where: { id: String(ctx.user.id) },
+      select: { municipalityName: true },
+    });
+
+    // Keep only ids genuinely linked downstream of this upstream issue.
+    const links = await prisma.issueChainLink.findMany({
+      where: {
+        upstreamIssueId: parsedInput.upstreamIssueId,
+        downstreamIssueId: { in: parsedInput.downstreamIssueIds },
+      },
+      select: { downstreamIssueId: true },
+    });
+    const linkedIds = links.map((l) => l.downstreamIssueId);
+    if (linkedIds.length === 0) return { resolved: 0 };
+
+    // Scope to the head's municipality and only still-open issues.
+    const targets = await prisma.issue.findMany({
+      where: {
+        id: { in: linkedIds },
+        municipalityName: head.municipalityName ?? undefined,
+        status: { not: IssueStatus.RESOLVED },
+      },
+      select: { id: true },
+    });
+    const targetIds = targets.map((t) => t.id);
+    if (targetIds.length === 0) return { resolved: 0 };
+
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.issue.updateMany({
+        where: { id: { in: targetIds } },
+        data: { status: IssueStatus.RESOLVED, resolvedAt: now, updatedAt: now },
+      }),
+      prisma.issueUpdate.createMany({
+        data: targetIds.map((id) => ({
+          issueId: id,
+          authorId: String(ctx.user.id),
+          content:
+            "Resolved as part of a coordinated fix of the upstream root cause. Dispute if the problem persists.",
+          images: [],
+          statusChange: IssueStatus.RESOLVED,
+        })),
+      }),
+    ]);
+
+    return { resolved: targetIds.length };
+  });

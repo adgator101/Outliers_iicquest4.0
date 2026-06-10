@@ -215,6 +215,15 @@ model Issue {
   rootIssueId              String?
   rootIssue                RootIssue? @relation(fields: [rootIssueId], references: [id])
 
+  // Cascading causal chains (STORY-010). A directed cause→effect graph between
+  // issues, distinct from the flat RootIssue grouping.
+  //   upstreamLinks   = links where THIS issue is the cause (its downstream effects)
+  //   downstreamLinks = links where THIS issue is the effect (its upstream causes)
+  // chainRootIssueId points to the top of this issue's chain (self or upstream root).
+  upstreamLinks    IssueChainLink[] @relation("UpstreamLinks")
+  downstreamLinks  IssueChainLink[] @relation("DownstreamLinks")
+  chainRootIssueId String?
+
   aiRootCauseSuggestion    String?
   aiRootCauseReason        String?
   aiRootCauseConfidence    Float?
@@ -281,4 +290,18 @@ model RootIssue {
   updatedAt   DateTime        @updatedAt
 
   @@map("root_issue")
+}
+
+// Directed causal link between two issues (cause → effect). See STORY-010.
+model IssueChainLink {
+  id                String   @id @default(cuid())
+  upstreamIssueId   String
+  upstreamIssue     Issue    @relation("UpstreamLinks", fields: [upstreamIssueId], references: [id])
+  downstreamIssueId String
+  downstreamIssue   Issue    @relation("DownstreamLinks", fields: [downstreamIssueId], references: [id])
+  detectedAt        DateTime @default(now())
+  confidence        Float    @default(0.7) // rule-based score
+
+  @@unique([upstreamIssueId, downstreamIssueId])
+  @@map("issue_chain_link")
 }

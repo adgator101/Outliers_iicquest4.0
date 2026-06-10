@@ -187,3 +187,78 @@ export async function getEmployeePerformance(
     ])
   );
 }
+
+// ─── Cascading issue chains (STORY-010) ───────────────────────────────────────
+
+// Groups of causally-linked issues whose chain root is not yet resolved, scoped
+// to the viewer's municipality. Surfaced to LOCAL_BODY_HEAD as "one fix, many
+// complaints" alerts.
+export async function getPendingChainAlerts(where: Prisma.IssueWhereInput) {
+  const links = await prisma.issueChainLink.findMany({
+    where: { downstreamIssue: where },
+    select: {
+      upstreamIssue: { select: { id: true } },
+      downstreamIssue: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          category: true,
+          wardNumber: true,
+          municipalityName: true,
+          chainRootIssueId: true,
+        },
+      },
+    },
+  });
+  if (links.length === 0) return [];
+
+  // Group downstream issues by their chain root.
+  const byRoot = new Map<string, typeof links[number]["downstreamIssue"][]>();
+  for (const l of links) {
+    const rootId = l.downstreamIssue.chainRootIssueId ?? l.upstreamIssue.id;
+    const list = byRoot.get(rootId) ?? [];
+    list.push(l.downstreamIssue);
+    byRoot.set(rootId, list);
+  }
+
+  const roots = await prisma.issue.findMany({
+    where: { id: { in: [...byRoot.keys()] } },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      category: true,
+      wardNumber: true,
+      municipalityName: true,
+    },
+  });
+
+  return roots
+    // Only alert while the root is still open — once the cause is fixed the
+    // cascade-resolve flow takes over.
+    .filter((root) => root.status !== IssueStatus.RESOLVED)
+    .map((root) => ({
+      root,
+      downstream: byRoot.get(root.id) ?? [],
+      linkedCount: (byRoot.get(root.id) ?? []).length + 1, // + the root itself
+    }))
+    .sort((a, b) => b.linkedCount - a.linkedCount);
+}
+
+// Open issues directly downstream of an upstream issue — used to offer a
+// coordinated cascade-resolve once the upstream is fixed.
+export async function getDownstreamOpenIssues(upstreamIssueId: string) {
+  const links = await prisma.issueChainLink.findMany({
+    where: {
+      upstreamIssueId,
+      downstreamIssue: { status: { in: OPEN_STATUSES } },
+    },
+    select: {
+      downstreamIssue: {
+        select: { id: true, title: true, status: true, category: true, wardNumber: true },
+      },
+    },
+  });
+  return links.map((l) => l.downstreamIssue);
+}

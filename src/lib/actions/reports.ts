@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { analyzeReport } from "@/lib/ai/analyze-report";
 import { Category, IssueStatus, Priority } from "@/generated/prisma/client";
 import { computeImpact, haversineDistance, maxPriority } from "@/lib/utils";
+import { detectCascadeLink } from "@/lib/causal-graph";
 import type { ReportAIAnalysis, ClusterResult } from "@/types";
 
 const GEO_RADIUS_METERS = 50;
@@ -138,12 +139,68 @@ async function createNewIssueFromReport(
     },
   });
 
+  // Cascade detection (STORY-010): is this new issue a downstream effect of an
+  // existing nearby upstream issue? Best-effort — never blocks submission.
+  await detectAndLinkCascade(issue);
+
   return {
     outcome: "created",
     reportId: report.id,
     issueId: issue.id,
     issueTitle: issue.title,
   };
+}
+
+// Looks for an upstream cause among nearby open issues and, if found, records a
+// directed IssueChainLink and joins the new issue to that chain.
+async function detectAndLinkCascade(issue: {
+  id: string;
+  category: Category;
+  latitude: number;
+  longitude: number;
+  createdAt: Date;
+  municipalityName: string | null;
+}): Promise<void> {
+  try {
+    const candidates = await prisma.issue.findMany({
+      where: {
+        status: { in: OPEN_STATUSES },
+        id: { not: issue.id },
+        ...(issue.municipalityName
+          ? { municipalityName: issue.municipalityName }
+          : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        category: true,
+        latitude: true,
+        longitude: true,
+        createdAt: true,
+        chainRootIssueId: true,
+      },
+    });
+
+    const link = detectCascadeLink(issue, candidates);
+    if (!link) return;
+
+    await prisma.$transaction([
+      prisma.issueChainLink.create({
+        data: {
+          upstreamIssueId: link.upstreamIssueId,
+          downstreamIssueId: issue.id,
+          confidence: link.confidence,
+        },
+      }),
+      prisma.issue.update({
+        where: { id: issue.id },
+        data: { chainRootIssueId: link.chainRootIssueId },
+      }),
+    ]);
+  } catch {
+    // Detection is non-critical; a failure must not break report submission.
+  }
 }
 
 // ─── Main clustering action ─────────────────────────────────────────────────

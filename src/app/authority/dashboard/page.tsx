@@ -4,7 +4,7 @@ import { Role, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   getDashboardStats,
-  getEscalatedIssues,
+  getAttentionIssues,
   getRootCauseSuggestions,
   scopeForUser,
 } from "@/lib/queries";
@@ -21,11 +21,11 @@ import {
 import { IssueCard } from "@/components/civic/issue-card";
 import { IssueStatusBadge } from "@/components/civic/issue-status-badge";
 import { PriorityBadge } from "@/components/civic/priority-badge";
-import { EscalationBadge } from "@/components/civic/escalation-badge";
 import { VerifyButton } from "@/components/civic/verify-button";
 import { AuthorityIssueList } from "@/components/civic/authority-issue-list";
 import { RootCauseSuggestionCard } from "@/components/civic/root-cause-suggestion-card";
 import { AssignIssueDialog } from "@/components/civic/assign-issue-dialog";
+import { AttentionBadge } from "@/components/civic/attention-badge";
 import { categoriesForDepartment, DEPARTMENT_LABELS } from "@/lib/departments";
 import { cn } from "@/lib/utils";
 
@@ -60,10 +60,10 @@ export default async function AuthorityDashboardPage() {
       });
   const sectionDept = me?.isSectionHead ? me.department : null;
 
-  const [stats, escalations, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue] =
+  const [stats, attentionIssues, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue] =
     await Promise.all([
       getDashboardStats(scope),
-      getEscalatedIssues(scope),
+      getAttentionIssues(scope),
       isHead
         ? prisma.issue.findMany({
             where: { ...scope, status: "SUBMITTED" },
@@ -107,11 +107,11 @@ export default async function AuthorityDashboardPage() {
       accent: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
     },
     {
-      label: "Escalated",
-      value: stats.escalatedCount,
+      label: "Needs Attention",
+      value: stats.attentionCount,
       icon: AlertTriangle,
       accent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
-      highlight: stats.escalatedCount > 0,
+      highlight: stats.attentionCount > 0,
     },
     {
       label: "Resolved",
@@ -272,25 +272,23 @@ export default async function AuthorityDashboardPage() {
         />
       </section>
 
-      {/* Escalations */}
+      {/* Needs attention */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">Escalated Issues</h2>
-          <Badge variant="secondary">{escalations.length}</Badge>
+          <h2 className="text-lg font-semibold tracking-tight">Needs Attention</h2>
+          <Badge variant="secondary">{attentionIssues.length}</Badge>
         </div>
-        {escalations.length === 0 ? (
+        {attentionIssues.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No escalated issues — all within SLA.
+            Nothing waiting too long — every open issue is within its attention window.
           </p>
         ) : (
           <div className="space-y-2">
-            {escalations.map((issue) => {
+            {attentionIssues.map((issue) => {
               const borderClass =
-                issue.escalation.hoursOverdue > 168
+                issue.attention.daysInStatus > issue.attention.limit * 2
                   ? "border-l-4 border-red-500"
-                  : issue.escalation.hoursOverdue > 24
-                  ? "border-l-4 border-amber-500"
-                  : "border-l-4 border-border";
+                  : "border-l-4 border-amber-500";
               return (
                 <Link
                   key={issue.id}
@@ -318,9 +316,8 @@ export default async function AuthorityDashboardPage() {
                         </p>
                       </div>
                       <div className="shrink-0">
-                        <EscalationBadge
+                        <AttentionBadge
                           status={issue.status}
-                          priority={issue.priority}
                           updatedAt={issue.updatedAt}
                           dueDate={issue.dueDate}
                         />

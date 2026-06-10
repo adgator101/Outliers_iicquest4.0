@@ -69,11 +69,11 @@ export default async function ExecutiveDashboardPage() {
       accent: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
     },
     {
-      label: "Escalated",
-      value: stats.escalatedCount,
+      label: "Needs Attention",
+      value: stats.attentionCount,
       icon: AlertTriangle,
       accent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
-      highlight: stats.escalatedCount > 0,
+      highlight: stats.attentionCount > 0,
     },
     {
       label: "Resolved",

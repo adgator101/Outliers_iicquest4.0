@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, LogOut, LayoutDashboard, PlusCircle } from "lucide-react";
+import { ShieldCheck, LogOut, LayoutDashboard, PlusCircle, Users2 } from "lucide-react";
 import { authClient, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,9 +32,13 @@ function navLinksForRole(role: Role): { href: string; label: string; icon: React
         { href: "/report", label: "Report Issue", icon: <PlusCircle className="size-4" /> },
       ];
     case "LOCAL_BODY_EMPLOYEE":
+      return [
+        { href: "/authority/dashboard", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
+      ];
     case "LOCAL_BODY_HEAD":
       return [
         { href: "/authority/dashboard", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
+        { href: "/authority/team", label: "Team", icon: <Users2 className="size-4" /> },
       ];
     case "EXECUTIVE_BODY":
       return [

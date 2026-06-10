@@ -223,6 +223,11 @@ model Issue {
   escalatedAt  DateTime?
   dueDate      DateTime?
 
+  // Phase timestamps for honest, phase-split age tracking (STORY-009).
+  verifiedAt   DateTime?
+  assignedAt   DateTime?
+  resolvedAt   DateTime?
+
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 

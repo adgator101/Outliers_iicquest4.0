@@ -66,7 +66,14 @@ export const verifyIssueAction = authActionClient
 
     await prisma.issue.update({
       where: { id: parsedInput.issueId },
-      data: { confirmCount, disputeCount, status: newStatus },
+      data: {
+        confirmCount,
+        disputeCount,
+        status: newStatus,
+        ...(newStatus === IssueStatus.VERIFIED && issue.status === IssueStatus.SUBMITTED
+          ? { verifiedAt: new Date() }
+          : {}),
+      },
     });
 
     return { verification, confirmCount, disputeCount, newStatus };
@@ -92,8 +99,11 @@ export const updateIssueStatusAction = roleActionClient([
         data: {
           status: parsedInput.status,
           updatedAt: new Date(),
-          ...(parsedInput.status === IssueStatus.IN_PROGRESS && !issue.escalatedAt
-            ? {} // keep escalatedAt as-is
+          ...(parsedInput.status === IssueStatus.VERIFIED && !issue.verifiedAt
+            ? { verifiedAt: new Date() }
+            : {}),
+          ...(parsedInput.status === IssueStatus.RESOLVED
+            ? { resolvedAt: new Date() }
             : {}),
         },
       }),
@@ -178,6 +188,7 @@ export const assignIssueAction = roleActionClient([
         data: {
           status: IssueStatus.ASSIGNED,
           assignedToId: parsedInput.assignedToId,
+          assignedAt: new Date(),
           dueDate: parsedInput.dueDate ? new Date(parsedInput.dueDate) : undefined,
         },
       }),

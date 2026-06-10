@@ -67,11 +67,12 @@ export type RootCauseAIAnalysis = {
   reasoning: string;
 };
 
-// Escalation status computed on the fly
-export type EscalationStatus = {
-  isEscalated: boolean;
-  hoursOverdue: number;
-  threshold: string;
+// Attention status computed on the fly — factual age in current status, no SLA.
+export type AttentionStatus = {
+  flagged: boolean;
+  daysInStatus: number;
+  reason: string;
+  limit: number;
 };
 
 // Result of the report-submission clustering pipeline (geo → semantic → impact).

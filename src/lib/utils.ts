@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { IssueStatus, Priority, Category } from "@/generated/prisma/client";
-import type { EscalationStatus } from "@/types";
+import { IssueStatus, Priority, Category } from "@/generated/prisma/enums";
+import type { AttentionStatus } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,44 +50,68 @@ export function maxPriority(a: Priority, b: Priority): Priority {
   return PRIORITY_RANK[a] >= PRIORITY_RANK[b] ? a : b;
 }
 
-// SLA thresholds in hours by status
-const SLA_HOURS: Record<IssueStatus, number | null> = {
-  SUBMITTED: 48,
-  VERIFIED: 72,
-  ASSIGNED: 7 * 24,
-  IN_PROGRESS: 14 * 24,
-  RESOLVED: null,
-  REOPENED: 7 * 24,
-};
+// ─── Age-based accountability (honest, descriptive — never a promised fix date) ──
+// We do NOT invent SLAs or priority multipliers. We surface how long something has
+// gone unaddressed, and flag items that have waited beyond a plain attention
+// threshold. These thresholds sort/highlight; they never claim a deadline was missed.
+export const ATTENTION_THRESHOLD_DAYS = {
+  SUBMITTED: 3, // unverified too long (community / HEAD)
+  VERIFIED: 3, // sat unassigned (section head / HEAD)
+  ACTIVE: 14, // ASSIGNED / IN_PROGRESS / REOPENED — in an officer's hands
+} as const;
 
-const PRIORITY_MULTIPLIERS: Record<Priority, number> = {
-  CRITICAL: 0.25,
-  HIGH: 0.5,
-  MEDIUM: 1,
-  LOW: 2,
-};
+export function daysSince(date: Date | string): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000);
+}
 
-export function computeEscalation(
+// Whole-issue age since first reported.
+export function issueAgeDays(createdAt: Date | string): number {
+  return daysSince(createdAt);
+}
+
+// Days a status is allowed to sit before it's flagged for attention.
+export function attentionLimit(status: IssueStatus): number {
+  switch (status) {
+    case IssueStatus.SUBMITTED:
+      return ATTENTION_THRESHOLD_DAYS.SUBMITTED;
+    case IssueStatus.VERIFIED:
+      return ATTENTION_THRESHOLD_DAYS.VERIFIED;
+    case IssueStatus.RESOLVED:
+      return Infinity; // resolved issues are not "waiting"
+    default:
+      return ATTENTION_THRESHOLD_DAYS.ACTIVE;
+  }
+}
+
+// Factual "needs attention" — based purely on how long the issue has sat in its
+// current status. No priority multiplier, no fabricated SLA, no fix-date promise.
+export function needsAttention(
   status: IssueStatus,
-  priority: Priority,
-  updatedAt: Date,
-  dueDate: Date | null
-): EscalationStatus {
-  const slaHours = SLA_HOURS[status];
-  if (slaHours === null) return { isEscalated: false, hoursOverdue: 0, threshold: "" };
+  updatedAt: Date | string
+): AttentionStatus {
+  const daysInStatus = daysSince(updatedAt);
+  const limit = attentionLimit(status);
+  const reason =
+    status === IssueStatus.SUBMITTED
+      ? "Unverified"
+      : status === IssueStatus.VERIFIED
+      ? "Unassigned"
+      : status === IssueStatus.RESOLVED
+      ? "Resolved"
+      : "Open";
+  return { flagged: daysInStatus > limit, daysInStatus, reason, limit };
+}
 
-  const effectiveSlaHours = dueDate
-    ? (dueDate.getTime() - new Date(updatedAt).getTime()) / 3_600_000
-    : slaHours * PRIORITY_MULTIPLIERS[priority];
-
-  const hoursElapsed = (Date.now() - new Date(updatedAt).getTime()) / 3_600_000;
-  const hoursOverdue = Math.max(0, hoursElapsed - effectiveSlaHours);
-
-  return {
-    isEscalated: hoursOverdue > 0,
-    hoursOverdue: Math.round(hoursOverdue),
-    threshold: `${Math.round(effectiveSlaHours)}h SLA`,
-  };
+// A voluntary commitment date set by the HEAD's office — a real human promise,
+// tracked factually. The system never fabricates this date.
+export function commitmentState(dueDate: Date | string | null): {
+  hasCommitment: boolean;
+  daysPast: number;
+  passed: boolean;
+} {
+  if (!dueDate) return { hasCommitment: false, daysPast: 0, passed: false };
+  const daysPast = daysSince(dueDate);
+  return { hasCommitment: true, daysPast: Math.max(0, daysPast), passed: daysPast > 0 };
 }
 
 export function formatRelativeTime(date: Date): string {
@@ -132,9 +156,4 @@ export function categoryLabel(category: Category): string {
     OTHER: "Other",
   };
   return labels[category];
-}
-
-// Confidence % shown to officers ("Confidence: 94%") derived from impact score.
-export function impactConfidencePct(score: number): number {
-  return Math.round(score * 100);
 }

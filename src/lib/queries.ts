@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { computeEscalation } from "@/lib/utils";
+import { needsAttention, daysSince, ATTENTION_THRESHOLD_DAYS } from "@/lib/utils";
 import { IssueStatus, Prisma, Role } from "@/generated/prisma/client";
 import type { CurrentUser } from "@/lib/session";
 
@@ -41,20 +41,22 @@ export async function getDashboardStats(where: Prisma.IssueWhereInput) {
   const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
   const open = total - byStatus.RESOLVED;
 
-  const escalated = await getEscalatedIssues(where);
+  const attention = await getAttentionIssues(where);
 
   return {
     total,
     open,
     byStatus,
-    escalatedCount: escalated.length,
+    attentionCount: attention.length,
     resolved: byStatus.RESOLVED,
   };
 }
 
-export type EscalatedIssue = Awaited<ReturnType<typeof getEscalatedIssues>>[number];
+export type AttentionIssue = Awaited<ReturnType<typeof getAttentionIssues>>[number];
 
-export async function getEscalatedIssues(where: Prisma.IssueWhereInput) {
+// Open issues that have sat in their current status beyond the plain attention
+// threshold. Factual age only — no SLA, no priority multiplier.
+export async function getAttentionIssues(where: Prisma.IssueWhereInput) {
   const issues = await prisma.issue.findMany({
     where: { ...where, status: { in: OPEN_STATUSES } },
     select: {
@@ -80,10 +82,10 @@ export async function getEscalatedIssues(where: Prisma.IssueWhereInput) {
   return issues
     .map((i) => ({
       ...i,
-      escalation: computeEscalation(i.status, i.priority, i.updatedAt, i.dueDate),
+      attention: needsAttention(i.status, i.updatedAt),
     }))
-    .filter((i) => i.escalation.isEscalated)
-    .sort((a, b) => b.escalation.hoursOverdue - a.escalation.hoursOverdue);
+    .filter((i) => i.attention.flagged)
+    .sort((a, b) => b.attention.daysInStatus - a.attention.daysInStatus);
 }
 
 // Issues carrying an AI root-cause suggestion above the 0.65 confidence
@@ -116,4 +118,72 @@ export async function getRootCauseSuggestions(where: Prisma.IssueWhereInput) {
     },
     orderBy: { aiRootCauseConfidence: "desc" },
   });
+}
+
+// Per-employee performance — built entirely from factual durations, no targets or
+// scores. Resolution time is measured ONLY over the assigned→resolved window, so an
+// officer is never charged for time before the issue reached them.
+export type EmployeePerformance = {
+  open: number;
+  resolved: number;
+  avgResolutionDays: number | null;
+  oldestOpenDays: number | null;
+  pastThreshold: number; // open issues sitting past the ACTIVE attention threshold
+};
+
+export async function getEmployeePerformance(
+  where: Prisma.IssueWhereInput
+): Promise<Record<string, EmployeePerformance>> {
+  const issues = await prisma.issue.findMany({
+    where: { ...where, assignedToId: { not: null } },
+    select: {
+      assignedToId: true,
+      status: true,
+      assignedAt: true,
+      resolvedAt: true,
+      updatedAt: true,
+    },
+  });
+
+  const acc: Record<
+    string,
+    { open: number; resolved: number; resSum: number; resN: number; oldestOpen: number; past: number }
+  > = {};
+
+  for (const i of issues) {
+    const id = i.assignedToId!;
+    const a =
+      (acc[id] ??= { open: 0, resolved: 0, resSum: 0, resN: 0, oldestOpen: 0, past: 0 });
+
+    if (i.status === IssueStatus.RESOLVED) {
+      a.resolved++;
+      if (i.assignedAt && i.resolvedAt) {
+        const d =
+          (new Date(i.resolvedAt).getTime() - new Date(i.assignedAt).getTime()) /
+          86_400_000;
+        if (d >= 0) {
+          a.resSum += d;
+          a.resN++;
+        }
+      }
+    } else {
+      a.open++;
+      const age = daysSince(i.updatedAt);
+      if (age > a.oldestOpen) a.oldestOpen = age;
+      if (age > ATTENTION_THRESHOLD_DAYS.ACTIVE) a.past++;
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(acc).map(([id, a]) => [
+      id,
+      {
+        open: a.open,
+        resolved: a.resolved,
+        avgResolutionDays: a.resN ? Math.round(a.resSum / a.resN) : null,
+        oldestOpenDays: a.open ? a.oldestOpen : null,
+        pastThreshold: a.past,
+      },
+    ])
+  );
 }

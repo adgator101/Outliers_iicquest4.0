@@ -10,7 +10,14 @@ import {
 } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2 } from "lucide-react";
+import {
+  Building2,
+  FolderOpen,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
+} from "lucide-react";
 import { IssueCard } from "@/components/civic/issue-card";
 import { IssueStatusBadge } from "@/components/civic/issue-status-badge";
 import { PriorityBadge } from "@/components/civic/priority-badge";
@@ -63,16 +70,37 @@ export default async function AuthorityDashboardPage() {
     ]);
 
   const statCards = [
-    { label: "Open Issues", value: stats.open },
-    { label: "Pending Verification", value: stats.byStatus.SUBMITTED },
-    { label: "Escalated", value: stats.escalatedCount },
-    { label: "Resolved", value: stats.byStatus.RESOLVED },
+    {
+      label: "Open Issues",
+      value: stats.open,
+      icon: FolderOpen,
+      accent: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+    },
+    {
+      label: "Pending Verification",
+      value: stats.byStatus.SUBMITTED,
+      icon: Clock,
+      accent: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    },
+    {
+      label: "Escalated",
+      value: stats.escalatedCount,
+      icon: AlertTriangle,
+      accent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
+      highlight: stats.escalatedCount > 0,
+    },
+    {
+      label: "Resolved",
+      value: stats.byStatus.RESOLVED,
+      icon: CheckCircle2,
+      accent: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400",
+    },
   ];
 
   return (
-    <>
+    <div className="space-y-8">
       {/* Header */}
-      <div>
+      <div className="border-b pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">
           {isHead ? "Municipality Dashboard" : "My Assigned Issues"}
         </h1>
@@ -87,10 +115,22 @@ export default async function AuthorityDashboardPage() {
       {/* Stats strip */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">{s.label}</p>
-              <p className="mt-1 text-3xl font-bold tracking-tight">{s.value}</p>
+          <Card
+            key={s.label}
+            className={cn(
+              s.highlight && "border-red-200 dark:border-red-900/60"
+            )}
+          >
+            <CardContent className="flex items-center justify-between gap-3 pt-6">
+              <div className="min-w-0">
+                <p className="truncate text-sm text-muted-foreground">{s.label}</p>
+                <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
+                  {s.value}
+                </p>
+              </div>
+              <div className={cn("grid size-10 shrink-0 place-items-center rounded-lg", s.accent)}>
+                <s.icon className="size-5" />
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -100,6 +140,7 @@ export default async function AuthorityDashboardPage() {
       {isHead && (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
+            <Sparkles className="size-5 text-violet-600" />
             <h2 className="text-lg font-semibold tracking-tight">
               Root Cause Suggestions
             </h2>
@@ -166,6 +207,7 @@ export default async function AuthorityDashboardPage() {
           userId={user.id}
           municipalityName={user.municipalityName}
           isEmployee={!isHead}
+          isHead={isHead}
         />
       </section>
 
@@ -230,6 +272,6 @@ export default async function AuthorityDashboardPage() {
           </div>
         )}
       </section>
-    </>
+    </div>
   );
 }

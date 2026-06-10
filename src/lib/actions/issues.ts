@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { authActionClient, roleActionClient } from "@/lib/safe-action";
 import {
   updateIssueStatusSchema,
@@ -171,4 +172,14 @@ export const createRootIssueAction = roleActionClient([Role.LOCAL_BODY_HEAD])
     });
 
     return { rootIssue };
+  });
+
+export const setIssueDueDateAction = roleActionClient([Role.LOCAL_BODY_HEAD])
+  .schema(z.object({ issueId: z.string(), dueDate: z.string() }))
+  .action(async ({ parsedInput }) => {
+    const issue = await prisma.issue.update({
+      where: { id: parsedInput.issueId },
+      data: { dueDate: new Date(parsedInput.dueDate) },
+    });
+    return { issue };
   });

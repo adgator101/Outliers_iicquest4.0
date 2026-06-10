@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   const ward = sp.get("ward");
   if (ward) where.wardNumber = Number(ward);
 
+  const assignedTo = sp.get("assignedTo");
+  if (assignedTo) where.assignedToId = assignedTo;
+
   // Filters from query params
   if (sp.get("municipality")) where.municipalityName = sp.get("municipality");
   if (sp.get("district")) where.districtName = sp.get("district");

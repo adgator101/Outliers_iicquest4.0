@@ -1,0 +1,492 @@
+---
+alwaysApply: true
+---
+---
+
+# CivicChain Nepal - AI Development Context
+
+You are assisting with the development of CivicChain Nepal, a hackathon project built for the theme:
+
+"Rebuilding Systems Designed for Yesterday - Building Solutions that Scale"
+
+The platform is NOT a simple complaint submission system.
+
+CivicChain is a civic accountability and governance intelligence platform that transforms citizen reports into actionable, trackable, verifiable public issues.
+
+The primary goal is:
+
+* Improve accountability
+* Improve transparency
+* Improve prioritization
+* Surface root causes instead of symptoms
+* Ensure no complaint is ignored
+
+Always prioritize hackathon speed, simplicity, and demo impact.
+
+Avoid enterprise complexity.
+
+---
+
+# Core Product Vision
+
+Traditional grievance systems collect complaints.
+
+CivicChain manages outcomes.
+
+Existing systems focus on:
+
+* Complaint intake
+* Ticket generation
+* Manual follow-up
+
+CivicChain focuses on:
+
+* Issue aggregation
+* Community verification
+* Root cause detection
+* Accountability tracking
+* Escalation workflows
+* Resolution verification
+
+---
+
+# Roles and RBAC
+
+There are four roles. Use the enum name exactly as written everywhere in code.
+
+## CITIZEN
+
+Regular registered user. Scoped to their own ward/municipality.
+
+Can:
+
+* Submit reports
+* Upload photos
+* Add location
+* View issues in their ward and nearby
+* Verify issues (CONFIRM or DISPUTE)
+* Support existing reports
+* View progress of issues they reported
+
+Cannot:
+
+* Change issue status
+* Assign issues
+* Access any dashboard
+
+## LOCAL_BODY_EMPLOYEE
+
+Ward-level or municipality-level employee. Acts under direction of LOCAL_BODY_HEAD.
+Maps to: ward secretary, palika technical officer, sanitation officer, etc.
+
+Can:
+
+* View issues assigned to them
+* Update issue status (ASSIGNED → IN_PROGRESS → RESOLVED)
+* Upload evidence/photos on updates
+* Post updates to the issue timeline
+* Request clarification from citizens
+
+Cannot:
+
+* Assign issues to other officers
+* Create root issues
+* View issues outside their municipality
+
+## LOCAL_BODY_HEAD
+
+Head of a local body (ward chairperson, municipal executive officer, etc.).
+Scoped to their municipality. The primary decision-maker at local level.
+
+Can:
+
+* Assign issues to LOCAL_BODY_EMPLOYEE
+* Monitor all issues in their municipality
+* Review and set deadlines
+* View escalated issues
+* Accept or reject AI root cause suggestions
+* Create and manage Root Issues
+* View municipality-level metrics and heatmap
+
+Cannot:
+
+* View issues outside their own municipality
+* View national-level data
+
+## EXECUTIVE_BODY
+
+National-level oversight role. Ministry officials, NPC, national governance bodies.
+Read-only access to everything. Cannot modify any data.
+
+Can:
+
+* View all issues across all municipalities and provinces
+* View national heatmap of all active issues
+* View system-wide transparency metrics
+* Filter by province, district, municipality, category, status
+* View root cause clusters nationally
+* Export reports (future)
+
+Cannot:
+
+* Create, modify, or close any issue
+* Assign any issue
+* Interact with any citizen data
+
+---
+
+# Administrative Hierarchy (Nepal Context)
+
+Issues and users are tagged with administrative levels for scoping:
+
+Province → District → Municipality (Palika) → Ward
+
+All issues must store:
+
+* wardNumber
+* municipalityName
+* districtName
+* provinceName
+
+All users (except CITIZEN) must have their jurisdiction set on their profile.
+
+Scoping rules:
+
+* CITIZEN: can submit from any location, views issues in their ward
+* LOCAL_BODY_EMPLOYEE: scoped to their municipalityName
+* LOCAL_BODY_HEAD: scoped to their municipalityName
+* EXECUTIVE_BODY: no scope restriction — sees everything
+
+---
+
+# Primary Workflow
+
+Citizen submits report -> AI categorizes + checks for duplicates -> Report attaches to existing Issue OR creates new Issue -> Community verifies issue (3 verifications OR LOCAL_BODY_HEAD manual) -> Issue assigned to LOCAL_BODY_EMPLOYEE by LOCAL_BODY_HEAD -> Employee investigates -> Employee uploads updates -> Employee marks resolved -> Citizen + community verify resolution -> Issue closed OR Issue reopened
+
+If AI detects root cause pattern across 3+ related issues -> Suggestion stored on each Issue -> LOCAL_BODY_HEAD reviews suggestion -> Accepts/edits/rejects -> Root Issue created and issues linked
+
+---
+
+# Duplicate Report Clustering & Community Impact Score
+
+Duplication is not a bug — it is a signal. More reports on the same issue means higher community impact, which means higher priority. CivicChain turns noise into intelligence.
+
+## The Problem
+
+If 40 people report the same pothole, traditional systems create 40 separate tickets flooding the officer's queue. Noise kills efficiency.
+
+## How CivicChain Handles It
+
+### Step 1 — Geospatial Clustering (Primary Check)
+
+When a report is submitted, the system queries: are there existing open Issues within a **50-meter radius** of the same category?
+
+* If yes → new Report is attached to the parent Issue as a "Related Report"
+* The citizen still receives their own Tracking ID for personal tracking
+* Internally, the report increments the parent Issue's `reportCount` and recalculates `communityImpactScore`
+* No new Issue is created
+
+### Step 2 — Semantic Similarity (AI Layer, fallback)
+
+If no geospatial match is found within 50m, Gemini compares the new report text against nearby open Issues:
+
+* Similarity ≥ 0.80 → merge: attach to parent Issue, no new Issue created
+* Similarity 0.50–0.79 → prompt citizen: "A similar issue exists nearby — attach your report to it, or submit separately?"
+* Similarity < 0.50 → create new Issue
+
+Example: "Bhrikuti Chowk road ma thulo khaldo cha" and "Near Bhrikuti the road has a big hole" → 91% semantic similarity → merged into parent Issue.
+
+### Step 3 — Community Impact Score
+
+Each verified related report increases the parent Issue's `communityImpactScore`. Priority is automatically elevated based on thresholds:
+
+| Reports | Confidence | Action |
+|---------|------------|--------|
+| 1       | 30%        | No change |
+| 3       | 60%        | No change |
+| 8       | 88%        | Auto-elevate to HIGH priority |
+| 15+     | 98%        | Auto-elevate to CRITICAL, LOCAL_BODY_HEAD notified |
+
+Priority auto-elevation (8+ or 15+ reports) is the ONLY exception where AI influences priority without human approval — because it is purely arithmetic, not predictive.
+
+## What the Officer Sees
+
+Instead of 14 separate tickets, the officer sees ONE aggregated Issue:
+
+> "Road Damage — Bhrikuti Chowk | 14 citizens affected | Confidence: 94% | HIGH PRIORITY"
+
+## Database Fields Required on Issue
+
+* `reportCount` — total number of reports attached (including originating report)
+* `communityImpactScore` — computed float 0.0–1.0 based on reportCount thresholds
+* `affectedCitizenCount` — same as reportCount (alias for display)
+
+## Implementation Rule
+
+Geospatial check runs first (SQL query: haversine distance < 50m AND same category AND status not RESOLVED/CLOSED).
+Semantic check only runs if geospatial finds no match.
+Both checks happen synchronously during report submission, before any Issue record is written.
+
+---
+
+# Key Innovation: ROOT CAUSE INTELLIGENCE
+
+The most important feature.
+
+Design decisions (FINAL):
+
+* AI detects that multiple Issues in the same area share a systemic cause
+* AI suggests a Root Issue title + reason + confidence score
+* This suggestion is stored on each Issue (aiRootCauseSuggestion, aiRootCauseReason, aiRootCauseConfidence)
+* Suggestion is surfaced to LOCAL_BODY_HEAD on their dashboard
+* LOCAL_BODY_HEAD reviews and can: Accept & Create, Edit & Create, Dismiss, or Partial Accept
+* AI NEVER automatically creates a Root Issue
+* Only LOCAL_BODY_HEAD creates a Root Issue
+
+Trigger conditions for AI root cause analysis:
+
+* A new Issue is created when ≥ 3 Issues already exist in same ward with related categories
+* An Issue reaches VERIFIED and ≥ 2 other VERIFIED Issues exist within 500m
+* LOCAL_BODY_HEAD triggers manual analysis from dashboard
+
+Duplicate detection order (see "Duplicate Report Clustering" section for full details):
+
+* Geospatial match within 50m (same category, not RESOLVED) → attach to parent Issue immediately
+* Semantic similarity ≥ 0.80 → attach to parent Issue, no new Issue created
+* Semantic similarity 0.50–0.79 → prompt citizen to choose
+* Semantic similarity < 0.50 → create new Issue
+
+Root cause suggestion only surfaced to LOCAL_BODY_HEAD if confidence > 0.65.
+
+---
+
+# MVP Scope
+
+Only implement:
+
+* Authentication with RBAC (all 4 roles)
+* Report creation with AI analysis
+* Image uploads (local server storage)
+* Location capture (Mapbox)
+* Issue management and status lifecycle
+* Community verification
+* LOCAL_BODY_HEAD dashboard (assignment, root cause review, escalations)
+* LOCAL_BODY_EMPLOYEE dashboard (assigned issues, updates)
+* EXECUTIVE_BODY national view (heatmap, metrics)
+* Issue timeline
+* Escalation tracking
+* Root cause suggestion and review flow
+
+Everything else is secondary.
+
+---
+
+# Technical Stack
+
+Frontend:
+
+* Next.js 16 (App Router)
+* React 19
+* TypeScript
+* Tailwind CSS v4
+* shadcn/ui
+* next-safe-action (for type-safe server actions)
+
+Backend:
+
+* Next.js Route Handlers (GET endpoints, public data)
+* Server Actions via next-safe-action (mutations: report submit, status update, verify)
+
+Database:
+
+* PostgreSQL
+* Prisma ORM
+
+Authentication:
+
+* better-auth
+* Session stored in database (Prisma adapter)
+* Role stored on User model, enforced in middleware and server actions
+
+Storage:
+
+* Local server storage via Next.js public directory or /uploads route
+* Images saved to disk on the server, served via /api/uploads/[filename]
+* No external storage service
+
+Maps:
+
+* Mapbox GL JS
+* Used for location picker on report submit and issue heatmap views
+
+AI:
+
+* Google Gemini API (gemini-2.0-flash)
+* Called server-side only, never from client
+* Structured JSON output via response_mime_type: "application/json"
+
+Deployment:
+
+* Vercel (frontend + API)
+* Prisma Postgres (managed PostgreSQL on Vercel)
+
+---
+
+# Architecture Principles
+
+Keep architecture simple.
+
+Do NOT introduce:
+
+* Microservices
+* Message queues
+* Background workers or cron jobs
+* Redis or any cache layer
+* Separate AI service
+
+This is a hackathon MVP.
+
+Prefer:
+
+* Simple APIs
+* Clear database models
+* Fast implementation
+* Strong demo experience
+
+Escalation is computed on page load, not via background jobs.
+AI calls are made synchronously during report submission.
+No webhooks, no polling, no websockets.
+
+---
+
+# Database Rules
+
+A Report is NOT an Issue.
+
+Multiple Reports may belong to one Issue.
+
+An Issue may belong to one Root Issue.
+
+Relationships:
+
+User → Reports
+User → Verifications
+User → IssueUpdates
+User → AssignedIssues (as LOCAL_BODY_EMPLOYEE)
+
+Issue → Reports
+Issue → Updates (IssueUpdate)
+Issue → Verifications
+Issue → AssignedTo (User, LOCAL_BODY_EMPLOYEE)
+Issue → RootIssue (optional)
+
+RootIssue → Issues
+
+All Issues and Reports must store: wardNumber, municipalityName, districtName, provinceName.
+
+Issues must also store: reportCount (Int, default 1), communityImpactScore (Float, default 0.3), affectedCitizenCount (Int, default 1).
+
+---
+
+# Issue Status Lifecycle
+
+Only allow these transitions. Never bypass them.
+
+SUBMITTED → VERIFIED (3 citizen verifications OR LOCAL_BODY_HEAD manual action)
+VERIFIED → ASSIGNED (LOCAL_BODY_HEAD assigns to employee)
+ASSIGNED → IN_PROGRESS (LOCAL_BODY_EMPLOYEE starts work)
+IN_PROGRESS → RESOLVED (LOCAL_BODY_EMPLOYEE marks complete with evidence)
+RESOLVED → REOPENED (majority of verifiers dispute resolution)
+REOPENED → IN_PROGRESS (employee re-acknowledges)
+
+---
+
+# Escalation Rules
+
+Computed on page load. No background jobs.
+
+Status stuck at SUBMITTED > 48 hours → flag for LOCAL_BODY_HEAD (unverified queue)
+Status stuck at VERIFIED > 72 hours → alert LOCAL_BODY_HEAD (unassigned)
+Status stuck at ASSIGNED > 7 days → alert LOCAL_BODY_HEAD + employee
+Status stuck at IN_PROGRESS > 14 days → critical flag (visible on EXECUTIVE_BODY dashboard too)
+
+Priority multipliers on SLA:
+
+* CRITICAL: 0.25x (e.g. 3.5 days for IN_PROGRESS)
+* HIGH: 0.5x
+* MEDIUM: 1x (default)
+* LOW: 2x
+
+Store escalatedAt on Issue when first threshold is crossed.
+dueDate can be manually set by LOCAL_BODY_HEAD to override default SLA.
+
+---
+
+# AI Usage Rules
+
+AI may:
+
+* Categorize reports (category enum)
+* Suggest priority (LOW / MEDIUM / HIGH / CRITICAL)
+* Detect semantic duplicates (similarity score + matched issueId) — only after geospatial check finds no match
+* Suggest root causes (title + reason + confidence + related issue IDs)
+* Auto-elevate priority to HIGH when reportCount ≥ 8 (arithmetic, not predictive — this is the one exception to the human-approval rule)
+
+AI must NEVER:
+
+* Automatically resolve issues
+* Automatically assign responsibility
+* Automatically escalate issues
+* Create any database record directly
+
+Human validation is always required for all AI suggestions.
+
+All AI calls use Gemini with structured JSON output. Parse and validate before storing.
+
+---
+
+# UI Guidelines
+
+Design should feel:
+
+* Trustworthy
+* Clean
+* Mobile-first
+* Accessible
+
+Avoid:
+
+* Excessive animations
+* Fancy startup aesthetics
+* Overdesigned dashboards
+* Gradients on functional elements
+
+Prefer:
+
+* Simplicity
+* Readability
+* Clear hierarchy
+* Status badges with semantic color (not rainbow)
+
+---
+
+# Demo Priorities
+
+The demo should emphasize:
+
+1. Multiple reports cluster into one Issue — officer sees "14 citizens affected | Confidence: 94% | HIGH PRIORITY" instead of 14 tickets
+2. Community Impact Score climbing as more reports attach (show the score updating live)
+3. Root cause suggestion (AI pattern detection across Issues)
+4. LOCAL_BODY_HEAD accepts root cause and creates Root Issue
+5. Escalation timer shown on dashboard
+6. EXECUTIVE_BODY national heatmap showing all active issues
+
+These are more important than visual polish.
+
+---
+
+# Project Mission
+
+Every feature should answer:
+
+"How does this make civic issues more accountable, transparent, and harder to ignore?"

@@ -19,7 +19,7 @@ const FEATURES = [
     icon: Users,
     title: "Community impact score",
     body: "Every related report raises an issue's impact score and confidence, so the loudest real problems rise to the top automatically.",
-  },
+},
   {
     icon: Network,
     title: "Root cause intelligence",

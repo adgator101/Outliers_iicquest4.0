@@ -1,78 +1,150 @@
 import Link from "next/link";
+import { MapPin, Plus } from "lucide-react";
 import { requireRole } from "@/lib/session";
-import { Role } from "@/generated/prisma/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { MapPin, Plus, FileText } from "lucide-react";
+import { Role, Prisma } from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { IssueStatusBadge } from "@/components/civic/issue-status-badge";
+import { CommunityImpactMeter } from "@/components/civic/community-impact-meter";
+import { WardIssuesFeed } from "@/components/civic/ward-issues-feed";
+import { cn, formatRelativeTime } from "@/lib/utils";
+const issueCardSelect = {
+  id: true,
+  title: true,
+  category: true,
+  status: true,
+  priority: true,
+  wardNumber: true,
+  municipalityName: true,
+  reportCount: true,
+  communityImpactScore: true,
+  affectedCitizenCount: true,
+  createdAt: true,
+  updatedAt: true,
+  dueDate: true,
+} satisfies Prisma.IssueSelect;
 
 export default async function CitizenDashboardPage() {
   const user = await requireRole([Role.CITIZEN]);
 
+  const [myReports, wardIssues] = await Promise.all([
+    prisma.report.findMany({
+      where: { userId: user.id },
+      include: {
+        issue: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            communityImpactScore: true,
+            affectedCitizenCount: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    prisma.issue.findMany({
+      where: {
+        wardNumber: user.wardNumber ?? undefined,
+        municipalityName: user.municipalityName ?? undefined,
+      },
+      orderBy: { communityImpactScore: "desc" },
+      take: 30,
+      select: issueCardSelect,
+    }),
+  ]);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome, {user.name}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Citizen dashboard — report and track civic issues in your area.
-        </p>
-      </div>
-
-      {(user.municipalityName || user.wardNumber) && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MapPin className="size-4 shrink-0" />
-          <span>
-            {[user.municipalityName, user.wardNumber ? `Ward ${user.wardNumber}` : null]
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Welcome, {user.name}
+          </h1>
+          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <MapPin className="size-4 shrink-0" />
+            {[
+              user.municipalityName,
+              user.wardNumber ? `Ward ${user.wardNumber}` : null,
+            ]
               .filter(Boolean)
-              .join(", ")}
-          </span>
+              .join(" · ") || "Your area"}
+          </p>
         </div>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Plus className="size-4" />
-              Report an Issue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Spotted a civic problem? Submit a report and it will be tracked until resolved.
-            </p>
-            <Link
-              href="/report"
-              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Submit a report
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="size-4" />
-              Track Issues
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              View open issues in your ward and verify their status.
-            </p>
-            <Badge variant="outline" className="text-xs">Coming in next build</Badge>
-          </CardContent>
-        </Card>
+        <Link href="/report" className={cn(buttonVariants())}>
+          <Plus className="size-4" />
+          Report an Issue
+        </Link>
       </div>
 
-      <Card className="border-dashed">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground text-center">
-            Full citizen dashboard — your reports, nearby issues, and verification history — is being built in the next increment.
+      {/* My reports */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">My Reports</h2>
+        {myReports.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            You haven&apos;t submitted any reports yet.{" "}
+            <Link href="/report" className="font-medium text-primary underline">
+              Report an issue
+            </Link>
+            .
           </p>
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {myReports.map((report) =>
+              report.issue ? (
+                <Link
+                  key={report.id}
+                  href={`/issues/${report.issue.id}`}
+                  className="block"
+                >
+                  <Card className="space-y-2 p-4 transition-colors hover:bg-muted/40">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate font-medium leading-snug">
+                        {report.issue.title}
+                      </p>
+                      <IssueStatusBadge status={report.issue.status} />
+                    </div>
+                    <CommunityImpactMeter
+                      score={report.issue.communityImpactScore}
+                      affectedCitizenCount={report.issue.affectedCitizenCount}
+                      compact
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Reported {formatRelativeTime(new Date(report.createdAt))}
+                    </p>
+                  </Card>
+                </Link>
+              ) : (
+                <Card key={report.id} className="space-y-1 p-4">
+                  <p className="truncate font-medium leading-snug">
+                    {report.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Reported {formatRelativeTime(new Date(report.createdAt))} ·
+                    pending
+                  </p>
+                </Card>
+              )
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Ward issues */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Issues in Your Ward
+        </h2>
+        <WardIssuesFeed
+          initialIssues={wardIssues}
+          ward={user.wardNumber}
+          municipality={user.municipalityName}
+        />
+      </section>
     </div>
   );
 }

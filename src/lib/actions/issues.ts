@@ -9,6 +9,7 @@ import {
   createRootIssueSchema,
 } from "@/lib/validations/issue";
 import { prisma } from "@/lib/prisma";
+import { categoryToDepartment } from "@/lib/departments";
 import { IssueStatus, Role } from "@/generated/prisma/client";
 
 // Valid status transitions
@@ -110,14 +111,65 @@ export const updateIssueStatusAction = roleActionClient([
     return { issue: updated };
   });
 
-export const assignIssueAction = roleActionClient([Role.LOCAL_BODY_HEAD])
+export const assignIssueAction = roleActionClient([
+  Role.LOCAL_BODY_HEAD,
+  Role.LOCAL_BODY_EMPLOYEE,
+])
   .schema(assignIssueSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const { user } = ctx;
-    const issue = await prisma.issue.findUniqueOrThrow({ where: { id: parsedInput.issueId } });
+    const actor = await prisma.user.findUniqueOrThrow({
+      where: { id: String(ctx.user.id) },
+      select: {
+        role: true,
+        municipalityName: true,
+        department: true,
+        isSectionHead: true,
+      },
+    });
+
+    const issue = await prisma.issue.findUniqueOrThrow({
+      where: { id: parsedInput.issueId },
+    });
 
     if (issue.status !== IssueStatus.VERIFIED) {
       throw new Error("Issue must be VERIFIED before it can be assigned");
+    }
+    if (
+      actor.municipalityName &&
+      issue.municipalityName !== actor.municipalityName
+    ) {
+      throw new Error("That issue is not in your municipality.");
+    }
+
+    const assignee = await prisma.user.findUnique({
+      where: { id: parsedInput.assignedToId },
+      select: {
+        role: true,
+        municipalityName: true,
+        department: true,
+        isActive: true,
+      },
+    });
+    if (
+      !assignee ||
+      assignee.role !== Role.LOCAL_BODY_EMPLOYEE ||
+      !assignee.isActive ||
+      assignee.municipalityName !== issue.municipalityName
+    ) {
+      throw new Error("Pick an active officer in this municipality.");
+    }
+
+    // Section heads may only assign issues that belong to their own section, and
+    // only to officers within that section. The municipal HEAD can override and
+    // assign any issue to anyone in the municipality.
+    if (actor.role === Role.LOCAL_BODY_EMPLOYEE) {
+      const issueSection = categoryToDepartment(issue.category);
+      if (!actor.isSectionHead || actor.department !== issueSection) {
+        throw new Error("You can only assign issues for your own section.");
+      }
+      if (assignee.department !== actor.department) {
+        throw new Error("Assign to an officer in your section.");
+      }
     }
 
     const [updated] = await prisma.$transaction([
@@ -132,7 +184,7 @@ export const assignIssueAction = roleActionClient([Role.LOCAL_BODY_HEAD])
       prisma.issueUpdate.create({
         data: {
           issueId: parsedInput.issueId,
-          authorId: user.id,
+          authorId: String(ctx.user.id),
           content: parsedInput.comment ?? "Issue assigned",
           images: [],
           statusChange: IssueStatus.ASSIGNED,

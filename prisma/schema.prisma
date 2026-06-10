@@ -92,6 +92,11 @@ model User {
   department    Department?
   isActive      Boolean    @default(true)
 
+  // A section head (शाखा प्रमुख) leads one section: they receive verified issues
+  // for their section and assign them to officers. They are still an employee who
+  // can be assigned and work tickets themselves.
+  isSectionHead Boolean    @default(false)
+
   // Relations
   sessions           Session[]
   accounts           Account[]

@@ -183,6 +183,11 @@ model Issue {
   confirmCount  Int          @default(0)
   disputeCount  Int          @default(0)
 
+  // Duplicate clustering & community impact (see civicchain.mdc)
+  reportCount          Int   @default(1)
+  communityImpactScore Float @default(0.3)
+  affectedCitizenCount Int   @default(1)
+
   assignedToId  String?
   assignedTo    User?        @relation("AssignedOfficer", fields: [assignedToId], references: [id])
 

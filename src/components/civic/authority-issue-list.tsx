@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IssueCard, type IssueCardData } from "./issue-card";
+import { AssignIssueDialog } from "./assign-issue-dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const STATUS_TABS: { value: string; label: string }[] = [
@@ -17,11 +18,13 @@ export function AuthorityIssueList({
   initialIssues,
   userId,
   isEmployee = false,
+  isHead = false,
 }: {
   initialIssues: IssueCardData[];
   userId: string;
   municipalityName: string | null;
   isEmployee?: boolean;
+  isHead?: boolean;
 }) {
   const [status, setStatus] = useState<string>("ALL");
   const [issues, setIssues] = useState<IssueCardData[]>(initialIssues);
@@ -79,11 +82,14 @@ export function AuthorityIssueList({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {issues.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              issue={issue}
-              href={`/authority/issues/${issue.id}`}
-            />
+            <div key={issue.id} className="space-y-2">
+              <IssueCard issue={issue} href={`/authority/issues/${issue.id}`} />
+              {isHead && issue.status === "VERIFIED" && (
+                <div className="flex justify-end">
+                  <AssignIssueDialog issueId={issue.id} issueTitle={issue.title} />
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}

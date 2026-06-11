@@ -15,9 +15,9 @@ import { CommunityImpactMeter } from "@/components/civic/community-impact-meter"
 import { AttentionBadge } from "@/components/civic/attention-badge";
 import { IssueLocationMap } from "@/components/civic/issue-location-map";
 import { IssueTimeline } from "@/components/civic/issue-timeline";
-import { AssignIssueDialog } from "@/components/civic/assign-issue-dialog";
+import { RequestStatePanel } from "@/components/civic/request-officer-dialog";
+import { AssignmentRequestActions } from "@/components/civic/assignment-request-actions";
 import { StatusUpdateForm } from "@/components/civic/status-update-form";
-import { DeadlineForm } from "@/components/civic/deadline-form";
 import { CascadeResolveCard } from "@/components/civic/cascade-resolve-card";
 import { CascadeLinkBanner } from "@/components/civic/cascade-link-banner";
 
@@ -62,6 +62,7 @@ export default async function AuthorityIssueDetailPage({
         orderBy: { createdAt: "asc" },
       },
       assignedTo: { select: { id: true, name: true } },
+      requestedTo: { select: { id: true, name: true } },
       rootIssue: { select: { id: true, title: true } },
       downstreamLinks: {
         select: {
@@ -83,11 +84,13 @@ export default async function AuthorityIssueDetailPage({
   }
 
   const allowedNext = ALLOWED_NEXT[issue.status] ?? [];
-  const canAssign =
+  const canRequest =
     issue.status === IssueStatus.VERIFIED &&
     (isHead ||
       (!!me?.isSectionHead &&
         me.department === categoryToDepartment(issue.category)));
+  const canRespond =
+    issue.status === IssueStatus.VERIFIED && issue.requestedToId === user.id;
   const cascadeLink = issue.downstreamLinks[0] ?? null;
   const downstreamOpen =
     issue.status === IssueStatus.RESOLVED
@@ -194,21 +197,22 @@ export default async function AuthorityIssueDetailPage({
           ) : (
             <p className="text-sm text-muted-foreground">Not yet assigned.</p>
           )}
-          {canAssign && (
-            <AssignIssueDialog
+
+          {/* The requested officer accepts (commits a date) or declines. */}
+          {canRespond && (
+            <AssignmentRequestActions issueId={issue.id} issueTitle={issue.title} />
+          )}
+
+          {/* Section head / HEAD requests an officer, or sees the pending request. */}
+          {canRequest && !canRespond && (
+            <RequestStatePanel
               issueId={issue.id}
               issueTitle={issue.title}
               issueCategory={issue.category}
+              requestedToName={issue.requestedTo?.name ?? null}
             />
           )}
         </div>
-
-        {isHead && (
-          <>
-            <Separator />
-            <DeadlineForm issueId={issue.id} currentDueDate={issue.dueDate} />
-          </>
-        )}
 
         <Separator />
 

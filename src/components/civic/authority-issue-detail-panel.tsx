@@ -20,9 +20,9 @@ import { AttentionBadge } from "./attention-badge";
 import { CommunityImpactMeter } from "./community-impact-meter";
 import { IssueLocationMap } from "./issue-location-map";
 import { IssueTimeline } from "./issue-timeline";
-import { AssignIssueDialog } from "./assign-issue-dialog";
+import { RequestStatePanel } from "./request-officer-dialog";
+import { AssignmentRequestActions } from "./assignment-request-actions";
 import { StatusUpdateForm } from "./status-update-form";
-import { DeadlineForm } from "./deadline-form";
 import type {
   Category,
   Department,
@@ -55,6 +55,8 @@ type DetailIssue = {
   longitude: number | null;
   dueDate: string | null;
   updatedAt: string;
+  requestedToId: string | null;
+  requestedTo: { id: string; name: string } | null;
   assignedTo: { id: string; name: string } | null;
   rootIssue: { id: string; title: string } | null;
   reports: {
@@ -83,12 +85,14 @@ export function AuthorityIssueDetailPanel({
   revision,
   isHead,
   sectionDept,
+  currentUserId,
   onClose,
 }: {
   issueId: string;
   revision: string;
   isHead: boolean;
   sectionDept: Department | null;
+  currentUserId?: string;
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<DetailIssue | null>(null);
@@ -118,10 +122,17 @@ export function AuthorityIssueDetailPanel({
   }, [issueId, revision]);
 
   const allowedNext = detail ? ALLOWED_NEXT[detail.status] ?? [] : [];
-  const canAssign =
+  // Section head (of this category) or HEAD can run the request handshake.
+  const canRequest =
     !!detail &&
     detail.status === "VERIFIED" &&
     (isHead || (!!sectionDept && sectionDept === categoryToDepartment(detail.category)));
+  // The officer this issue was requested to can accept / decline.
+  const canRespond =
+    !!detail &&
+    detail.status === "VERIFIED" &&
+    !!currentUserId &&
+    detail.requestedToId === currentUserId;
 
   const place = detail
     ? [
@@ -231,24 +242,22 @@ export function AuthorityIssueDetailPanel({
                 ) : (
                   <p className="text-sm text-muted-foreground">Not yet assigned.</p>
                 )}
-                {canAssign && (
-                  <AssignIssueDialog
+
+                {/* The requested officer accepts / declines (commits the date). */}
+                {canRespond && (
+                  <AssignmentRequestActions issueId={detail.id} issueTitle={detail.title} />
+                )}
+
+                {/* Section head / HEAD requests an officer (or sees the pending request). */}
+                {canRequest && !canRespond && (
+                  <RequestStatePanel
                     issueId={detail.id}
                     issueTitle={detail.title}
                     issueCategory={detail.category}
+                    requestedToName={detail.requestedTo?.name ?? null}
                   />
                 )}
               </div>
-
-              {isHead && (
-                <>
-                  <Separator />
-                  <DeadlineForm
-                    issueId={detail.id}
-                    currentDueDate={detail.dueDate ? new Date(detail.dueDate) : null}
-                  />
-                </>
-              )}
 
               {allowedNext.length > 0 && (
                 <>

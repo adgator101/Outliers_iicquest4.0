@@ -143,6 +143,7 @@ export function AuthorityIssueMap({
   issues,
   isHead,
   sectionDept = null,
+  currentUserId,
   headerTitle,
   headerSubtitle,
   stats,
@@ -151,6 +152,7 @@ export function AuthorityIssueMap({
   issues: AuthorityMapIssue[];
   isHead: boolean;
   sectionDept?: Department | null;
+  currentUserId?: string;
   headerTitle: string;
   headerSubtitle: string;
   stats: MapStat[];
@@ -369,6 +371,7 @@ export function AuthorityIssueMap({
           revision={selected ? String(selected.updatedAt) : selectedId}
           isHead={isHead}
           sectionDept={sectionDept}
+          currentUserId={currentUserId}
           onClose={() => setSelectedId(null)}
         />
       )}

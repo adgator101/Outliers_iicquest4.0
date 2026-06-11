@@ -17,7 +17,8 @@ import { IssueStatusBadge } from "@/components/civic/issue-status-badge";
 import { PriorityBadge } from "@/components/civic/priority-badge";
 import { VerifyButton } from "@/components/civic/verify-button";
 import { RootCauseSuggestionCard } from "@/components/civic/root-cause-suggestion-card";
-import { AssignIssueDialog } from "@/components/civic/assign-issue-dialog";
+import { RequestStatePanel } from "@/components/civic/request-officer-dialog";
+import { AssignmentRequestActions } from "@/components/civic/assignment-request-actions";
 import { AttentionBadge } from "@/components/civic/attention-badge";
 import {
   AuthorityIssueMap,
@@ -44,6 +45,13 @@ const issueCardSelect = {
   dueDate: true,
 } satisfies Prisma.IssueSelect;
 
+// Section-head queue + officer inbox also need the pending-request marker.
+const queueSelect = {
+  ...issueCardSelect,
+  requestedToId: true,
+  requestedTo: { select: { name: true } },
+} satisfies Prisma.IssueSelect;
+
 export default async function AuthorityDashboardPage() {
   const user = await requireRole([Role.LOCAL_BODY_EMPLOYEE, Role.LOCAL_BODY_HEAD]);
   const isHead = user.role === Role.LOCAL_BODY_HEAD;
@@ -57,7 +65,24 @@ export default async function AuthorityDashboardPage() {
       });
   const sectionDept = me?.isSectionHead ? me.department : null;
 
-  const [stats, attentionIssues, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue, chainAlerts] =
+  // What the map shows:
+  //  • HEAD            → the whole municipality
+  //  • section head    → every issue in their section (any status/officer) + their own
+  //  • plain officer   → only issues assigned to them
+  const mapScope: Prisma.IssueWhereInput = isHead
+    ? scope
+    : sectionDept
+    ? {
+        ...scope,
+        OR: [
+          { category: { in: categoriesForDepartment(sectionDept) } },
+          { assignedToId: user.id },
+          { requestedToId: user.id },
+        ],
+      }
+    : { ...scope, OR: [{ assignedToId: user.id }, { requestedToId: user.id }] };
+
+  const [stats, attentionIssues, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue, chainAlerts, myRequests] =
     await Promise.all([
       getDashboardStats(scope),
       getAttentionIssues(scope),
@@ -70,7 +95,7 @@ export default async function AuthorityDashboardPage() {
           })
         : Promise.resolve([]),
       prisma.issue.findMany({
-        where: isHead ? scope : { ...scope, assignedToId: user.id },
+        where: mapScope,
         orderBy: [{ communityImpactScore: "desc" }, { createdAt: "desc" }],
         take: 100,
         select: issueCardSelect,
@@ -85,10 +110,19 @@ export default async function AuthorityDashboardPage() {
             },
             orderBy: [{ communityImpactScore: "desc" }, { createdAt: "desc" }],
             take: 30,
-            select: issueCardSelect,
+            select: queueSelect,
           })
         : Promise.resolve([]),
       isHead ? getPendingChainAlerts(scope) : Promise.resolve([]),
+      // Officer's inbox: VERIFIED issues this user has been requested to take.
+      user.role === Role.LOCAL_BODY_EMPLOYEE
+        ? prisma.issue.findMany({
+            where: { ...scope, status: "VERIFIED", requestedToId: user.id },
+            orderBy: { requestedAt: "desc" },
+            take: 30,
+            select: queueSelect,
+          })
+        : Promise.resolve([]),
     ]);
 
   const headerTitle = isHead
@@ -114,10 +148,33 @@ export default async function AuthorityDashboardPage() {
       issues={allIssues}
       isHead={isHead}
       sectionDept={sectionDept}
+      currentUserId={user.id}
       headerTitle={headerTitle}
       headerSubtitle={headerSubtitle}
       stats={statChips}
     >
+      {/* Requests for you — officer inbox */}
+      {myRequests.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">
+              Requests for You
+            </h2>
+            <Badge variant="secondary">{myRequests.length}</Badge>
+          </div>
+          <div className="space-y-2">
+            {myRequests.map((issue) => (
+              <div key={issue.id} className="space-y-2">
+                <SelectIssue issueId={issue.id}>
+                  <IssueCardBody issue={issue} />
+                </SelectIssue>
+                <AssignmentRequestActions issueId={issue.id} issueTitle={issue.title} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Section assignment queue — section heads only */}
       {sectionDept && (
         <section className="space-y-3">
@@ -138,13 +195,12 @@ export default async function AuthorityDashboardPage() {
                   <SelectIssue issueId={issue.id}>
                     <IssueCardBody issue={issue} />
                   </SelectIssue>
-                  <div className="flex justify-end">
-                    <AssignIssueDialog
-                      issueId={issue.id}
-                      issueTitle={issue.title}
-                      issueCategory={issue.category}
-                    />
-                  </div>
+                  <RequestStatePanel
+                    issueId={issue.id}
+                    issueTitle={issue.title}
+                    issueCategory={issue.category}
+                    requestedToName={issue.requestedTo?.name ?? null}
+                  />
                 </div>
               ))}
             </div>

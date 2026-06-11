@@ -11,6 +11,7 @@ import { PriorityBadge } from "@/components/civic/priority-badge";
 import { IssueLocationMap } from "@/components/civic/issue-location-map";
 import { IssueTimeline } from "@/components/civic/issue-timeline";
 import { VerifyIssueButtons } from "@/components/civic/verify-issue-buttons";
+import { ResolutionReview } from "@/components/civic/resolution-review";
 import { ReportTracker } from "@/components/civic/report-tracker";
 import { OfficerContactCard } from "@/components/civic/officer-contact-card";
 import { CascadeLinkBanner } from "@/components/civic/cascade-link-banner";
@@ -60,21 +61,44 @@ export default async function CitizenIssueDetailPage({
 
   if (!issue) notFound();
 
+  // Existence votes (SUBMITTED→VERIFIED) and resolution votes (RESOLVED→REOPENED)
+  // are tallied separately (STORY-018).
+  const verifyPhase = issue.status === "RESOLVED" ? "RESOLUTION" : "EXISTENCE";
+
   const myVerification =
     (
       await prisma.issueVerification.findUnique({
-        where: { issueId_userId: { issueId: id, userId: user.id } },
+        where: {
+          issueId_userId_phase: { issueId: id, userId: user.id, phase: verifyPhase },
+        },
         select: { type: true },
       })
     )?.type ?? null;
 
   const verifications = await prisma.issueVerification.findMany({
-    where: { issueId: id },
-    select: { type: true, isLocal: true, proofImages: true },
+    where: { issueId: id, phase: verifyPhase },
+    select: {
+      id: true,
+      type: true,
+      isLocal: true,
+      proofImages: true,
+      comment: true,
+      createdAt: true,
+      user: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
   });
   const confirms = verifications.filter((v) => v.type === "CONFIRM");
+  const disputes = verifications.filter((v) => v.type === "DISPUTE");
   const nearbyConfirms = confirms.filter((v) => v.isLocal).length;
   const photoConfirms = confirms.filter((v) => v.proofImages.length > 0).length;
+
+  // The officer's resolution claim (latest RESOLVED update) — shown openly so the
+  // community can judge the fix against real evidence (STORY-018b).
+  const resolvedUpdate =
+    issue.status === "RESOLVED"
+      ? [...issue.updates].reverse().find((u) => u.statusChange === "RESOLVED") ?? null
+      : null;
 
   const inProgressAt =
     [...issue.updates].reverse().find((u) => u.statusChange === "IN_PROGRESS")?.createdAt ?? null;
@@ -199,28 +223,57 @@ export default async function CitizenIssueDetailPage({
       )}
 
       {/* ── Community verification ──────────────────────────────────────────── */}
-      {VERIFIABLE_STATUSES.has(issue.status) && (
+      {issue.status === "RESOLVED" ? (
         <section className="space-y-3">
-          <h2 className="text-base font-semibold tracking-tight">
-            {issue.status === "RESOLVED" ? "Was this resolved?" : "Can you confirm this issue?"}
-          </h2>
-          <Card className="space-y-3 p-5">
-            <VerifyIssueButtons
+          <h2 className="text-base font-semibold tracking-tight">Was this resolved?</h2>
+          <Card className="p-5">
+            <ResolutionReview
               issueId={issue.id}
-              initialConfirmCount={issue.confirmCount}
-              initialDisputeCount={issue.disputeCount}
-              myVerification={myVerification}
-              issueStatus={issue.status}
+              myVote={myVerification}
+              officerEvidence={
+                resolvedUpdate
+                  ? {
+                      content: resolvedUpdate.content,
+                      images: resolvedUpdate.images,
+                      authorName: resolvedUpdate.author?.name ?? null,
+                      at: resolvedUpdate.createdAt,
+                    }
+                  : null
+              }
+              votes={verifications.map((v) => ({
+                id: v.id,
+                type: v.type,
+                isLocal: v.isLocal,
+                comment: v.comment,
+                proofImages: v.proofImages,
+                createdAt: v.createdAt,
+                userName: v.user?.name ?? null,
+              }))}
             />
-            {confirms.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {confirms.length} {confirms.length === 1 ? "resident has" : "residents have"} confirmed this
-                {nearbyConfirms > 0 ? ` · ${nearbyConfirms} from this ward` : ""}
-                {photoConfirms > 0 ? ` · ${photoConfirms} with photo proof` : ""}
-              </p>
-            )}
           </Card>
         </section>
+      ) : (
+        VERIFIABLE_STATUSES.has(issue.status) && (
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold tracking-tight">Can you confirm this issue?</h2>
+            <Card className="space-y-3 p-5">
+              <VerifyIssueButtons
+                issueId={issue.id}
+                initialConfirmCount={confirms.length}
+                initialDisputeCount={disputes.length}
+                myVerification={myVerification}
+                issueStatus={issue.status}
+              />
+              {confirms.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {confirms.length} {confirms.length === 1 ? "resident has" : "residents have"} confirmed this
+                  {nearbyConfirms > 0 ? ` · ${nearbyConfirms} from this ward` : ""}
+                  {photoConfirms > 0 ? ` · ${photoConfirms} with photo proof` : ""}
+                </p>
+              )}
+            </Card>
+          </section>
+        )
       )}
 
       {/* ── Photos ──────────────────────────────────────────────────────────── */}

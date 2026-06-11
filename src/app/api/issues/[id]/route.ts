@@ -27,6 +27,7 @@ export async function GET(
         orderBy: { createdAt: "asc" },
       },
       assignedTo: { select: { id: true, name: true, municipalityName: true } },
+      requestedTo: { select: { id: true, name: true } },
       rootIssue: true,
       _count: { select: { reports: true } },
     },
@@ -36,10 +37,13 @@ export async function GET(
     return NextResponse.json({ error: "Issue not found" }, { status: 404 });
   }
 
+  const verifyPhase = issue.status === "RESOLVED" ? "RESOLUTION" : "EXISTENCE";
   const myVerification = user
     ? (
         await prisma.issueVerification.findUnique({
-          where: { issueId_userId: { issueId: id, userId: user.id } },
+          where: {
+            issueId_userId_phase: { issueId: id, userId: user.id, phase: verifyPhase },
+          },
           select: { type: true },
         })
       )?.type ?? null

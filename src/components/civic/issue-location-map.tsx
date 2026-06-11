@@ -4,8 +4,7 @@ import { useState } from "react";
 import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { MapPin } from "lucide-react";
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLE_URL } from "@/lib/mapbox";
 
 export function IssueLocationMap({
   latitude,
@@ -19,7 +18,7 @@ export function IssueLocationMap({
   const [showPopup, setShowPopup] = useState(false);
 
   // ── Fallback: no Mapbox token → show text, never crash ─────────────────────
-  if (!MAPBOX_TOKEN) {
+  if (!MAPBOX_ACCESS_TOKEN) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
         <MapPin className="size-4 shrink-0" />
@@ -33,8 +32,8 @@ export function IssueLocationMap({
       <Map
         initialViewState={{ latitude, longitude, zoom: 15 }}
         interactive={false}
-        mapboxAccessToken={MAPBOX_TOKEN}
-        mapStyle="mapbox://styles/mapbox/light-v11"
+        mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
+        mapStyle={MAPBOX_STYLE_URL}
         style={{ width: "100%", height: "100%" }}
       >
         <Marker

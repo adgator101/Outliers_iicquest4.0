@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-khand), var(--font-mukta), ui-sans-serif, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -46,75 +46,139 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Brand palette — CivicChain Nepal */
+  --color-simrik: var(--simrik);
+  --color-nilo: var(--nilo);
+  --color-nilo-soft: var(--nilo-soft);
+  --color-kagaj: var(--kagaj);
+  --color-dhunga: var(--dhunga);
+
+  /* Issue lifecycle — single source of truth for badges AND map markers */
+  --color-status-submitted: var(--status-submitted);
+  --color-status-verified: var(--status-verified);
+  --color-status-assigned: var(--status-assigned);
+  --color-status-in-progress: var(--status-in-progress);
+  --color-status-resolved: var(--status-resolved);
+  --color-status-reopened: var(--status-reopened);
+  --color-status-closed: var(--status-closed);
+
+  --color-priority-low: var(--priority-low);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-high: var(--priority-high);
+  --color-priority-critical: var(--priority-critical);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Kagaj — warm paper field */
+  --background: #faf9f7;
+  --foreground: #29261f;
+  --card: #ffffff;
+  --card-foreground: #29261f;
+  --popover: #ffffff;
+  --popover-foreground: #29261f;
+  /* Simrik — Nepal's crimson, the action color */
+  --primary: #c42139;
+  --primary-foreground: #fdf7f5;
+  --secondary: #f0ede7;
+  --secondary-foreground: #29261f;
+  --muted: #f2efea;
+  --muted-foreground: #6f6b66;
+  --accent: #f7ecec;
+  --accent-foreground: #8e1729;
+  --destructive: #b3261e;
+  --border: #e6e2da;
+  --input: #e6e2da;
+  --ring: #c42139;
+  --chart-1: #c42139;
+  --chart-2: #22304a;
+  --chart-3: #d97706;
+  --chart-4: #047857;
+  --chart-5: #6f6b66;
+  --radius: 0.5rem;
+  --sidebar: #f5f3ef;
+  --sidebar-foreground: #29261f;
+  --sidebar-primary: #c42139;
+  --sidebar-primary-foreground: #fdf7f5;
+  --sidebar-accent: #ece9e2;
+  --sidebar-accent-foreground: #29261f;
+  --sidebar-border: #e6e2da;
+  --sidebar-ring: #c42139;
+
+  /* Brand */
+  --simrik: #c42139;
+  --nilo: #22304a;
+  --nilo-soft: #31425f;
+  --kagaj: #faf9f7;
+  --dhunga: #6f6b66;
+
+  /* Issue status */
+  --status-submitted: #64748b;
+  --status-verified: #2563eb;
+  --status-assigned: #4f46e5;
+  --status-in-progress: #b45309;
+  --status-resolved: #047857;
+  --status-reopened: #dc2626;
+  --status-closed: #475569;
+
+  /* Issue priority */
+  --priority-low: #64748b;
+  --priority-medium: #2563eb;
+  --priority-high: #d97706;
+  --priority-critical: #dc2626;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: #16191f;
+  --foreground: #f0eee9;
+  --card: #1d2129;
+  --card-foreground: #f0eee9;
+  --popover: #1d2129;
+  --popover-foreground: #f0eee9;
+  --primary: #e25a6e;
+  --primary-foreground: #1d0a0e;
+  --secondary: #272c36;
+  --secondary-foreground: #f0eee9;
+  --muted: #272c36;
+  --muted-foreground: #9b968f;
+  --accent: #32262a;
+  --accent-foreground: #f1c6cc;
+  --destructive: #e2574e;
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: #e25a6e;
+  --chart-1: #e25a6e;
+  --chart-2: #8ba3cc;
+  --chart-3: #e8a23d;
+  --chart-4: #34a584;
+  --chart-5: #9b968f;
+  --sidebar: #1d2129;
+  --sidebar-foreground: #f0eee9;
+  --sidebar-primary: #e25a6e;
+  --sidebar-primary-foreground: #1d0a0e;
+  --sidebar-accent: #272c36;
+  --sidebar-accent-foreground: #f0eee9;
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: #e25a6e;
+
+  --simrik: #e25a6e;
+  --nilo: #2b3c5e;
+  --nilo-soft: #3a4f78;
+  --kagaj: #16191f;
+  --dhunga: #9b968f;
+
+  --status-submitted: #94a3b8;
+  --status-verified: #60a5fa;
+  --status-assigned: #818cf8;
+  --status-in-progress: #fbbf24;
+  --status-resolved: #34d399;
+  --status-reopened: #f87171;
+  --status-closed: #94a3b8;
+
+  --priority-low: #94a3b8;
+  --priority-medium: #60a5fa;
+  --priority-high: #fbbf24;
+  --priority-critical: #f87171;
 }
 
 @layer base {
@@ -126,5 +190,23 @@
   }
   html {
     @apply font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  /* Double-pennant clip — echo of Nepal's flag silhouette. Use sparingly. */
+  .pennant-clip {
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - 14px),
+      calc(100% - 14px) 100%,
+      0 100%
+    );
   }
 }

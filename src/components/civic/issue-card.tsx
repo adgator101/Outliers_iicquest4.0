@@ -5,7 +5,7 @@ import { IssueStatusBadge } from "./issue-status-badge";
 import { PriorityBadge } from "./priority-badge";
 import { CommunityImpactMeter } from "./community-impact-meter";
 import { AttentionBadge } from "./attention-badge";
-import { categoryLabel, formatRelativeTime } from "@/lib/utils";
+import { categoryLabel, cn, formatRelativeTime, needsAttention } from "@/lib/utils";
 import type { Category, IssueStatus, Priority } from "@/generated/prisma/client";
 
 export type IssueCardData = {
@@ -31,9 +31,16 @@ export function IssueCard({
   issue: IssueCardData;
   href: string;
 }) {
+  const { flagged } = needsAttention(issue.status, issue.updatedAt);
+
   return (
     <Link href={href} className="block">
-      <Card className="p-4 transition-colors hover:bg-muted/40">
+      <Card
+        className={cn(
+          "p-4 transition-colors hover:bg-muted/40",
+          flagged && "border-l-2 border-l-simrik"
+        )}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <p className="truncate font-medium leading-snug">{issue.title}</p>

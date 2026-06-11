@@ -24,7 +24,11 @@ export function IssueTimeline({ updates }: { updates: TimelineEntry[] }) {
       {updates.map((u) => (
         <li key={u.id} className="relative">
           <span className="absolute -left-[27px] top-1 grid size-4 place-items-center rounded-full bg-background">
-            <CircleDot className="size-4 text-muted-foreground" />
+            <CircleDot
+              className={
+                u.statusChange ? "size-4 text-simrik" : "size-4 text-muted-foreground"
+              }
+            />
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">

@@ -36,9 +36,9 @@ export function CascadeResolveCard({
   if (dismissed || downstream.length === 0) return null;
 
   return (
-    <Card className="space-y-3 border-l-4 border-emerald-500 p-4">
+    <Card className="space-y-3 border-l-4 border-status-resolved p-4">
       <div className="flex items-center gap-2">
-        <GitBranch className="size-4 shrink-0 text-emerald-600" />
+        <GitBranch className="size-4 shrink-0 text-status-resolved" />
         <h2 className="text-sm font-semibold">Root cause fixed — resolve downstream?</h2>
       </div>
       <p className="text-sm text-muted-foreground">
@@ -49,7 +49,7 @@ export function CascadeResolveCard({
       <ul className="space-y-1 text-sm">
         {downstream.map((d) => (
           <li key={d.id} className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
+            <span className="size-1.5 rounded-full bg-status-resolved" />
             <span className="truncate">{d.title}</span>
           </li>
         ))}

@@ -28,8 +28,8 @@ export function AttentionBadge({
   const tone = !flagged
     ? "border-transparent bg-muted text-muted-foreground"
     : daysInStatus > limit * 2
-    ? "border-transparent bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-    : "border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300";
+    ? "border-transparent bg-priority-critical/10 text-priority-critical"
+    : "border-transparent bg-priority-high/10 text-priority-high";
 
   return (
     <span className={cn("inline-flex flex-wrap items-center gap-1.5", className)}>
@@ -38,7 +38,7 @@ export function AttentionBadge({
         {reason} {daysInStatus}d
       </Badge>
       {commitment.passed && (
-        <Badge className="border-transparent bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+        <Badge className="border-transparent bg-simrik/10 text-simrik">
           <CalendarClock className="size-3" />
           Commitment {commitment.daysPast}d ago
         </Badge>

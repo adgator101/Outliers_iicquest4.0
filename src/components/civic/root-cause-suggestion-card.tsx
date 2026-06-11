@@ -78,8 +78,8 @@ export function RootCauseSuggestionCard({
 
   if (state === "done") {
     return (
-      <Card className="border-l-4 border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20">
-        <CardContent className="flex items-center gap-2 py-4 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+      <Card className="border-l-4 border-status-resolved bg-status-resolved/5">
+        <CardContent className="flex items-center gap-2 py-4 text-sm font-medium text-status-resolved">
           <CheckCircle2 className="size-4 shrink-0" />
           Root issue created — {title}
         </CardContent>
@@ -91,11 +91,11 @@ export function RootCauseSuggestionCard({
   const hiddenCount = relatedIds.length - visibleRelated.length;
 
   return (
-    <Card className="border-l-4 border-violet-500">
+    <Card className="border-l-4 border-simrik">
       <CardContent className="space-y-3 pt-6">
         {/* Top row: pattern strength + category */}
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="gap-1 border-transparent bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+          <Badge className="gap-1 border-transparent bg-simrik/10 text-simrik">
             <Sparkles className="size-3" />
             {patternStrength}
           </Badge>

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ShieldCheck, LogOut, LayoutDashboard, PlusCircle, Users2 } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut, LayoutDashboard, PlusCircle, Users2 } from "lucide-react";
 import { authClient, useSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
 import {
   Avatar,
@@ -49,6 +51,7 @@ function navLinksForRole(role: Role): { href: string; label: string; icon: React
 
 export function TopNav() {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session, isPending } = useSession();
   const user = session?.user as
     | { name: string; email: string; role?: Role; municipalityName?: string | null }
@@ -70,31 +73,42 @@ export function TopNav() {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <ShieldCheck className="size-5 text-primary" />
-          <span>CivicChain</span>
-          <span className="hidden text-xs font-normal text-muted-foreground sm:inline">
-            Nepal
-          </span>
+    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+      <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="transition-opacity hover:opacity-80">
+          <BrandMark />
         </Link>
 
-        <nav className="flex items-center gap-1">
-          {links.map((l) => (
-            <Button key={l.href} variant="ghost" size="sm" render={<Link href={l.href} />}>
-              {l.icon}
-              <span className="hidden sm:inline">{l.label}</span>
-            </Button>
-          ))}
+        <nav className="flex items-center gap-0.5">
+          {links.map((l) => {
+            const active =
+              pathname === l.href || pathname.startsWith(`${l.href}/`);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={cn(
+                  "relative flex h-14 items-center gap-1.5 px-3 text-sm font-medium transition-colors",
+                  active
+                    ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-simrik"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {l.icon}
+                <span className="hidden sm:inline">{l.label}</span>
+              </Link>
+            );
+          })}
 
           {isPending ? null : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon" className="ml-1 rounded-full">
+                  <Button variant="ghost" size="icon" className="ml-2 rounded-full">
                     <Avatar className="size-8">
-                      <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                      <AvatarFallback className="bg-nilo text-xs font-medium text-white">
+                        {initials}
+                      </AvatarFallback>
                     </Avatar>
                   </Button>
                 }
@@ -124,7 +138,7 @@ export function TopNav() {
               <Button variant="ghost" size="sm" render={<Link href="/login" />}>
                 Log in
               </Button>
-              <Button size="sm" render={<Link href="/register" />}>
+              <Button size="sm" className="ml-1" render={<Link href="/register" />}>
                 Sign up
               </Button>
             </>

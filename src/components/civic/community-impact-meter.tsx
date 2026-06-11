@@ -18,12 +18,12 @@ export function CommunityImpactMeter({
   const fill = Math.round(Math.max(score, 0.04) * 100);
   const barColor =
     score >= 0.9
-      ? "bg-red-500"
+      ? "bg-priority-critical"
       : score >= 0.8
-      ? "bg-amber-500"
+      ? "bg-priority-high"
       : score >= 0.6
-      ? "bg-blue-500"
-      : "bg-slate-400";
+      ? "bg-priority-medium"
+      : "bg-priority-low/70";
 
   if (compact) {
     return (

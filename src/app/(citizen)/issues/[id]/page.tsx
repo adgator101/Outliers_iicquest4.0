@@ -71,17 +71,17 @@ export default async function CitizenIssueDetailPage({
   ].filter(Boolean);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back to dashboard
       </Link>
 
       {/* Title + status */}
-      <div className="space-y-2">
+      <div className="space-y-2 border-l-2 border-simrik pl-4">
         <div className="flex flex-wrap items-center gap-2">
           <IssueStatusBadge status={issue.status} />
           <PriorityBadge priority={issue.priority} />
@@ -91,7 +91,7 @@ export default async function CitizenIssueDetailPage({
             dueDate={issue.dueDate}
           />
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">{issue.title}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{issue.title}</h1>
         {issue.description && (
           <p className="text-sm text-foreground/90">{issue.description}</p>
         )}
@@ -158,8 +158,8 @@ export default async function CitizenIssueDetailPage({
 
       {/* Root issue banner */}
       {issue.rootIssue && (
-        <Card className="flex items-center gap-2 border-l-4 border-violet-500 p-4 text-sm">
-          <Layers className="size-4 shrink-0 text-violet-600" />
+        <Card className="flex items-center gap-2 border-l-4 border-nilo p-4 text-sm">
+          <Layers className="size-4 shrink-0 text-nilo" />
           <span>
             Part of a larger root issue:{" "}
             <span className="font-medium">{issue.rootIssue.title}</span>

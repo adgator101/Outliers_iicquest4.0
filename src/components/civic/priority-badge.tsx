@@ -2,11 +2,13 @@ import { Badge } from "@/components/ui/badge";
 import { cn, priorityLabel } from "@/lib/utils";
 import type { Priority } from "@/generated/prisma/client";
 
+// Priority colors come from the --priority-* tokens in globals.css —
+// the same source the map markers use.
 const PRIORITY_STYLES: Record<Priority, string> = {
-  LOW: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  MEDIUM: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  HIGH: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  CRITICAL: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  LOW: "bg-priority-low/10 text-priority-low",
+  MEDIUM: "bg-priority-medium/10 text-priority-medium",
+  HIGH: "bg-priority-high/10 text-priority-high",
+  CRITICAL: "bg-priority-critical/10 text-priority-critical",
 };
 
 export function PriorityBadge({

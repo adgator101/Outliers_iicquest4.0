@@ -3,7 +3,7 @@ import { Role, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDashboardStats } from "@/lib/queries";
 import { categoryLabel, cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Globe,
@@ -56,91 +56,83 @@ export default async function ExecutiveDashboardPage() {
   ]);
 
   const statCards = [
+    { label: "Total issues", value: stats.total, icon: Globe },
+    { label: "Open", value: stats.open, icon: FolderOpen },
     {
-      label: "Total Issues",
-      value: stats.total,
-      icon: Globe,
-      accent: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-    },
-    {
-      label: "Open",
-      value: stats.open,
-      icon: FolderOpen,
-      accent: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-    },
-    {
-      label: "Needs Attention",
+      label: "Needs attention",
       value: stats.attentionCount,
       icon: AlertTriangle,
-      accent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
       highlight: stats.attentionCount > 0,
     },
-    {
-      label: "Resolved",
-      value: stats.byStatus.RESOLVED,
-      icon: CheckCircle2,
-      accent: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400",
-    },
+    { label: "Resolved", value: stats.byStatus.RESOLVED, icon: CheckCircle2 },
   ];
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="border-b pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">National Overview</h1>
-        <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+      {/* Nilo chrome header band */}
+      <section className="pennant-clip bg-nilo px-6 py-7 text-white sm:px-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/60">
+            Executive body · सङ्घीय निगरानी
+          </p>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/80">
+            Read-only
+          </span>
+        </div>
+        <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
+          National Oversight
+        </h1>
+        <p className="mt-1 flex items-center gap-1.5 text-sm text-white/65">
           <Globe className="size-4 shrink-0" />
-          Read-only transparency dashboard — all municipalities, all provinces
+          All municipalities, all provinces
         </p>
-      </div>
 
-      {/* Stats strip */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((s) => (
-          <Card
-            key={s.label}
-            className={cn(s.highlight && "border-red-200 dark:border-red-900/60")}
-          >
-            <CardContent className="flex items-center justify-between gap-3 pt-6">
-              <div className="min-w-0">
-                <p className="truncate text-sm text-muted-foreground">{s.label}</p>
-                <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
-                  {s.value}
-                </p>
-              </div>
-              <div
+        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/15 pt-5 sm:grid-cols-4">
+          {statCards.map((s) => (
+            <div key={s.label}>
+              <p
                 className={cn(
-                  "grid size-10 shrink-0 place-items-center rounded-lg",
-                  s.accent
+                  "font-heading text-3xl font-semibold tabular-nums leading-none",
+                  s.highlight && "text-[#f1a0ac]"
                 )}
               >
-                <s.icon className="size-5" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                {s.value}
+              </p>
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs leading-snug text-white/60">
+                <s.icon className="size-3.5 shrink-0" />
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      {/* National heatmap */}
+      {/* National heatmap — the centerpiece */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
-          <MapPin className="size-5 text-primary" />
-          <h2 className="text-lg font-semibold tracking-tight">National Heatmap</h2>
+          <MapPin className="size-4 text-simrik" />
+          <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">
+            National Heatmap
+          </h2>
         </div>
         <NationalHeatmap issues={issues as HeatmapIssue[]} />
       </section>
 
       {/* National issue table */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">All Issues</h2>
+        <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">
+          All Issues
+        </h2>
         <NationalIssuesTable initialIssues={issues as NationalIssueRow[]} />
       </section>
 
       {/* Root cause clusters */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
-          <LayersIcon className="size-5 text-violet-600" />
-          <h2 className="text-lg font-semibold tracking-tight">Root Cause Clusters</h2>
+          <LayersIcon className="size-4 text-simrik" />
+          <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">
+            Root Cause Clusters
+          </h2>
           <Badge variant="secondary">{rootIssues.length}</Badge>
         </div>
         {rootIssues.length === 0 ? (

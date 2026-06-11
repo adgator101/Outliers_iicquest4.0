@@ -8,13 +8,6 @@ import { Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { roleHomePath } from "@/lib/roles";
 import type { Role } from "@/generated/prisma/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,12 +35,14 @@ export default function LoginPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Log in</CardTitle>
-        <CardDescription>Access your CivicChain account.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold tracking-tight">Log in</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Access your CivicChain account.
+        </p>
+      </div>
+      <div>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -84,7 +79,7 @@ export default function LoginPage() {
             Create one
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

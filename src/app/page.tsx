@@ -1,108 +1,181 @@
 import Link from "next/link";
-import {
-  ShieldCheck,
-  Users,
-  GitMerge,
-  Network,
-  AlarmClock,
-  Map,
-} from "lucide-react";
+import { GitMerge, Users, Network, MapPin } from "lucide-react";
+import { TopNav } from "@/components/layout/top-nav";
+import { BrandMark, PennantMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+
+const STEPS = [
+  {
+    title: "Report",
+    body: "A citizen reports a problem with a photo and location — in their own words, Nepali or English.",
+  },
+  {
+    title: "Cluster",
+    body: "Reports about the same problem merge into one issue. 14 reports become one case, not 14 tickets.",
+  },
+  {
+    title: "Verify",
+    body: "Neighbours confirm the issue is real. Three confirmations move it into the municipality's queue.",
+  },
+  {
+    title: "Assign",
+    body: "The section head routes it to an officer. Every handoff is recorded on a public timeline.",
+  },
+  {
+    title: "Resolve",
+    body: "The officer posts photo evidence of the fix. The community confirms — or reopens it.",
+  },
+];
+
 const FEATURES = [
   {
     icon: GitMerge,
-    title: "Reports cluster into issues",
-    body: "40 reports about one pothole become a single issue — not 40 tickets. Duplication becomes a signal of community impact, not noise.",
+    title: "Duplication is a signal",
+    body: "More reports on one problem means more people affected — priority rises automatically with the count.",
+  },
+  {
+    icon: Network,
+    title: "Root causes, not symptoms",
+    body: "Patterns across nearby issues surface systemic causes. A human official always reviews before anything is created.",
   },
   {
     icon: Users,
-    title: "Community impact score",
-    body: "Every related report raises an issue's impact score and confidence, so the loudest real problems rise to the top automatically.",
-},
-  {
-    icon: Network,
-    title: "Root cause intelligence",
-    body: "AI detects systemic patterns across issues and suggests root causes — but a human official always decides and creates them.",
+    title: "Community keeps it honest",
+    body: "Citizens verify both the problem and the fix. A resolution only stands when the people who reported it agree.",
   },
   {
-    icon: AlarmClock,
-    title: "Accountability & escalation",
-    body: "Issues that sit too long escalate on their own SLA timers, so nothing quietly gets ignored.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Community verification",
-    body: "Citizens confirm or dispute issues and resolutions, keeping officials honest end-to-end.",
-  },
-  {
-    icon: Map,
-    title: "National transparency",
-    body: "A read-only national view surfaces active issues and clusters across every municipality and province.",
+    icon: MapPin,
+    title: "Nothing sits quietly",
+    body: "Issues that wait too long are flagged in plain terms — \"Unassigned 5d\", \"Open 17d\" — visible to everyone.",
   },
 ];
+
+function MockIssueCard() {
+  return (
+    <div className="w-full max-w-sm">
+      {/* stacked report hints behind the card */}
+      <div className="relative">
+        <div className="absolute -top-3 left-3 right-3 h-10 rounded-lg border border-border bg-card/60" />
+        <div className="absolute -top-1.5 left-1.5 right-1.5 h-10 rounded-lg border border-border bg-card/80" />
+        <div className="pennant-clip relative rounded-lg border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-heading text-lg font-semibold leading-tight">
+                Road damage — Bhrikuti Chowk
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Ward 7 · Lalitpur Metropolitan City
+              </p>
+            </div>
+            <span className="rounded-full bg-priority-high/10 px-2.5 py-0.5 text-xs font-semibold text-priority-high">
+              HIGH
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium">14 citizens affected</span>
+              <span className="text-muted-foreground">Open 3d</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full w-[88%] rounded-full bg-simrik" />
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+            <GitMerge className="size-3.5 text-simrik" />
+            14 reports merged into one issue
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <span className="flex items-center gap-2 font-semibold">
-            <ShieldCheck className="size-5 text-primary" />
-            CivicChain <span className="text-sm font-normal text-muted-foreground">Nepal</span>
-          </span>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" render={<Link href="/login" />}>
-              Log in
-            </Button>
-            <Button size="sm" render={<Link href="/register" />}>
-              Get started
-            </Button>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       <main className="flex-1">
-        <section className="mx-auto max-w-6xl px-4 py-20 text-center">
-          <p className="mx-auto mb-4 w-fit rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
-            Civic accountability & governance intelligence
-          </p>
-          <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-            Turn citizen reports into outcomes the system can&apos;t ignore.
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-            Traditional grievance systems collect complaints. CivicChain manages
-            outcomes — aggregating reports, verifying issues, surfacing root causes,
-            and tracking accountability from report to resolution.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button size="lg" render={<Link href="/register" />}>
-              Report an issue
-            </Button>
-            <Button size="lg" variant="outline" render={<Link href="/login" />}>
-              Log in
-            </Button>
+        {/* Hero */}
+        <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:py-24 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <p className="mb-4 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-simrik">
+              <PennantMark className="size-4" />
+              जनताको आवाज — on the record
+            </p>
+            <h1 className="max-w-xl text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+              Reports the system can&apos;t ignore.
+            </h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted-foreground">
+              CivicChain turns citizen complaints into public, trackable issues —
+              clustered by community, verified by neighbours, and followed from
+              report to resolution.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Button size="lg" render={<Link href="/register" />}>
+                Report an issue
+              </Button>
+              <Button size="lg" variant="outline" render={<Link href="/login" />}>
+                Log in
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-center lg:justify-end">
+            <MockIssueCard />
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 pb-24">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* How it works — a real sequence, so the numbering carries meaning */}
+        <section className="border-y border-border bg-card">
+          <div className="mx-auto max-w-6xl px-4 py-16">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              From complaint to closed — in public
+            </h2>
+            <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
+              {STEPS.map((s, i) => (
+                <div key={s.title}>
+                  <p className="font-heading text-3xl font-semibold text-simrik">
+                    {String(i + 1).padStart(2, "0")}
+                  </p>
+                  <h3 className="mt-2 text-base font-semibold">{s.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                    {s.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Principles */}
+        <section className="mx-auto max-w-6xl px-4 py-16">
+          <div className="grid gap-x-10 gap-y-10 sm:grid-cols-2">
             {FEATURES.map((f) => (
-              <Card key={f.title}>
-                <CardContent className="space-y-2">
-                  <f.icon className="size-6 text-primary" />
-                  <h3 className="font-medium">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground">{f.body}</p>
-                </CardContent>
-              </Card>
+              <div key={f.title} className="flex gap-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent">
+                  <f.icon className="size-5 text-simrik" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold">{f.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {f.body}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
         </section>
       </main>
 
-      <footer className="border-t py-6">
-        <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground">
-          CivicChain Nepal — making civic issues accountable, transparent, and harder to ignore.
+      <footer className="bg-nilo py-10 text-white">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 sm:flex-row sm:items-center">
+          <BrandMark inverted />
+          <p className="text-sm text-white/70">
+            Making civic issues accountable, transparent, and harder to ignore.
+          </p>
         </div>
       </footer>
     </div>

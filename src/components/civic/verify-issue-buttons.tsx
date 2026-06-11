@@ -55,7 +55,7 @@ export function VerifyIssueButtons({
           variant={vote === "CONFIRM" ? "default" : "outline"}
           disabled={isPending}
           onClick={() => cast("CONFIRM")}
-          className={cn(vote === "CONFIRM" && "ring-2 ring-emerald-500/40")}
+          className={cn(vote === "CONFIRM" && "ring-2 ring-status-resolved/40")}
         >
           {isPending && vote === "CONFIRM" ? (
             <Loader2 className="size-4 animate-spin" />

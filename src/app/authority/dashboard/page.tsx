@@ -6,26 +6,23 @@ import {
   getDashboardStats,
   getAttentionIssues,
   getRootCauseSuggestions,
+  getPendingChainAlerts,
   scopeForUser,
 } from "@/lib/queries";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Building2,
-  FolderOpen,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  Sparkles,
-} from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { IssueCard } from "@/components/civic/issue-card";
 import { IssueStatusBadge } from "@/components/civic/issue-status-badge";
 import { PriorityBadge } from "@/components/civic/priority-badge";
 import { VerifyButton } from "@/components/civic/verify-button";
-import { AuthorityIssueList } from "@/components/civic/authority-issue-list";
 import { RootCauseSuggestionCard } from "@/components/civic/root-cause-suggestion-card";
 import { AssignIssueDialog } from "@/components/civic/assign-issue-dialog";
 import { AttentionBadge } from "@/components/civic/attention-badge";
+import {
+  AuthorityIssueMap,
+  type MapStat,
+} from "@/components/civic/authority-issue-map";
 import { categoriesForDepartment, DEPARTMENT_LABELS } from "@/lib/departments";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +37,8 @@ const issueCardSelect = {
   affectedCitizenCount: true,
   wardNumber: true,
   municipalityName: true,
+  latitude: true,
+  longitude: true,
   createdAt: true,
   updatedAt: true,
   dueDate: true,
@@ -50,8 +49,6 @@ export default async function AuthorityDashboardPage() {
   const isHead = user.role === Role.LOCAL_BODY_HEAD;
   const scope = scopeForUser(user);
 
-  // Section heads (employees flagged isSectionHead) get a queue of verified issues
-  // for their section to assign within their team.
   const me = isHead
     ? null
     : await prisma.user.findUnique({
@@ -60,7 +57,7 @@ export default async function AuthorityDashboardPage() {
       });
   const sectionDept = me?.isSectionHead ? me.department : null;
 
-  const [stats, attentionIssues, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue] =
+  const [stats, attentionIssues, submittedIssues, allIssues, rootCauseSuggestions, sectionQueue, chainAlerts] =
     await Promise.all([
       getDashboardStats(scope),
       getAttentionIssues(scope),
@@ -75,7 +72,7 @@ export default async function AuthorityDashboardPage() {
       prisma.issue.findMany({
         where: isHead ? scope : { ...scope, assignedToId: user.id },
         orderBy: [{ communityImpactScore: "desc" }, { createdAt: "desc" }],
-        take: 50,
+        take: 100,
         select: issueCardSelect,
       }),
       isHead ? getRootCauseSuggestions(scope) : Promise.resolve([]),
@@ -91,95 +88,50 @@ export default async function AuthorityDashboardPage() {
             select: issueCardSelect,
           })
         : Promise.resolve([]),
+      isHead ? getPendingChainAlerts(scope) : Promise.resolve([]),
     ]);
 
-  const statCards = [
-    {
-      label: "Open Issues",
-      value: stats.open,
-      icon: FolderOpen,
-      accent: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-    },
-    {
-      label: "Pending Verification",
-      value: stats.byStatus.SUBMITTED,
-      icon: Clock,
-      accent: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-    },
-    {
-      label: "Needs Attention",
-      value: stats.attentionCount,
-      icon: AlertTriangle,
-      accent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
-      highlight: stats.attentionCount > 0,
-    },
-    {
-      label: "Resolved",
-      value: stats.byStatus.RESOLVED,
-      icon: CheckCircle2,
-      accent: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400",
-    },
+  const headerTitle = isHead
+    ? "Municipality Dashboard"
+    : sectionDept
+    ? `${DEPARTMENT_LABELS[sectionDept]} — Section`
+    : "My Assigned Issues";
+  const headerSubtitle =
+    (sectionDept ? "Section head · " : "") +
+    ([user.municipalityName, user.districtName, user.provinceName]
+      .filter(Boolean)
+      .join(" · ") || "Your jurisdiction");
+
+  const statChips: MapStat[] = [
+    { label: "Open", value: stats.open },
+    { label: "Pending", value: stats.byStatus.SUBMITTED },
+    { label: "Attention", value: stats.attentionCount, alert: true },
+    { label: "Resolved", value: stats.byStatus.RESOLVED },
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="border-b pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isHead
-            ? "Municipality Dashboard"
-            : sectionDept
-            ? `${DEPARTMENT_LABELS[sectionDept]} — Section`
-            : "My Assigned Issues"}
-        </h1>
-        <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-          <Building2 className="size-4 shrink-0" />
-          {sectionDept ? "Section head · " : ""}
-          {[user.municipalityName, user.districtName, user.provinceName]
-            .filter(Boolean)
-            .join(" · ") || "Your jurisdiction"}
-        </p>
-      </div>
-
-      {/* Stats strip */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((s) => (
-          <Card
-            key={s.label}
-            className={cn(
-              s.highlight && "border-red-200 dark:border-red-900/60"
-            )}
-          >
-            <CardContent className="flex items-center justify-between gap-3 pt-6">
-              <div className="min-w-0">
-                <p className="truncate text-sm text-muted-foreground">{s.label}</p>
-                <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
-                  {s.value}
-                </p>
-              </div>
-              <div className={cn("grid size-10 shrink-0 place-items-center rounded-lg", s.accent)}>
-                <s.icon className="size-5" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
+    <AuthorityIssueMap
+      issues={allIssues}
+      isHead={isHead}
+      headerTitle={headerTitle}
+      headerSubtitle={headerSubtitle}
+      stats={statChips}
+    >
       {/* Section assignment queue — section heads only */}
       {sectionDept && (
-        <section className="space-y-4">
+        <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">
               Awaiting Assignment — {DEPARTMENT_LABELS[sectionDept]}
             </h2>
             <Badge variant="secondary">{sectionQueue.length}</Badge>
           </div>
           {sectionQueue.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing waiting. Verified issues for your section appear here to assign.
+              Nothing waiting. Verified issues for your section appear here.
             </p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
               {sectionQueue.map((issue) => (
                 <div key={issue.id} className="space-y-2">
                   <IssueCard issue={issue} href={`/authority/issues/${issue.id}`} />
@@ -197,92 +149,85 @@ export default async function AuthorityDashboardPage() {
         </section>
       )}
 
-      {/* Root cause suggestions — HEAD only, demo-critical */}
-      {isHead && (
-        <section className="space-y-4">
+      {/* Root cause suggestions — HEAD only */}
+      {isHead && rootCauseSuggestions.length > 0 && (
+        <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-violet-600" />
-            <h2 className="text-lg font-semibold tracking-tight">
-              Root Cause Suggestions
-            </h2>
+            <Sparkles className="size-4 text-simrik" />
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">Root Cause Suggestions</h2>
             <Badge variant="secondary">{rootCauseSuggestions.length}</Badge>
           </div>
-          {rootCauseSuggestions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No root cause suggestions at this time.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {rootCauseSuggestions.map((s) => (
-                <RootCauseSuggestionCard
-                  key={s.id}
-                  issueId={s.id}
-                  suggestion={s.aiRootCauseSuggestion ?? ""}
-                  reason={s.aiRootCauseReason ?? ""}
-                  confidence={s.aiRootCauseConfidence ?? 0}
-                  relatedIds={s.aiRootCauseRelatedIds}
-                  category={s.category}
-                  municipalityName={s.municipalityName}
-                  districtName={s.districtName}
-                  provinceName={s.provinceName}
-                />
-              ))}
-            </div>
-          )}
+          <div className="space-y-3">
+            {rootCauseSuggestions.map((s) => (
+              <RootCauseSuggestionCard
+                key={s.id}
+                issueId={s.id}
+                suggestion={s.aiRootCauseSuggestion ?? ""}
+                reason={s.aiRootCauseReason ?? ""}
+                confidence={s.aiRootCauseConfidence ?? 0}
+                relatedIds={s.aiRootCauseRelatedIds}
+                category={s.category}
+                municipalityName={s.municipalityName}
+                districtName={s.districtName}
+                provinceName={s.provinceName}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Cascading complaints — HEAD only */}
+      {isHead && chainAlerts.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">Cascading Complaints</h2>
+            <Badge variant="secondary">{chainAlerts.length}</Badge>
+          </div>
+          <div className="space-y-2">
+            {chainAlerts.map((alert) => (
+              <Link key={alert.root.id} href={`/authority/issues/${alert.root.id}`} className="block">
+                <Card className="border-l-4 border-amber-500 p-3 transition-colors hover:bg-muted/40">
+                  <p className="text-sm font-medium">
+                    {alert.root.wardNumber ? `Ward ${alert.root.wardNumber} · ` : ""}
+                    {alert.linkedCount} linked issues
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    Root: {alert.root.title} · fix once, clear the chain
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
 
       {/* Verification queue — HEAD only */}
-      {isHead && (
-        <section className="space-y-4">
+      {isHead && submittedIssues.length > 0 && (
+        <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">Needs Verification</h2>
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">Needs Verification</h2>
             <Badge variant="secondary">{submittedIssues.length}</Badge>
           </div>
-          {submittedIssues.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No issues pending verification.
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {submittedIssues.map((issue) => (
-                <div key={issue.id} className="space-y-2">
-                  <IssueCard issue={issue} href={`/authority/issues/${issue.id}`} />
-                  <div className="flex justify-end">
-                    <VerifyButton issueId={issue.id} />
-                  </div>
+          <div className="space-y-2">
+            {submittedIssues.map((issue) => (
+              <div key={issue.id} className="space-y-2">
+                <IssueCard issue={issue} href={`/authority/issues/${issue.id}`} />
+                <div className="flex justify-end">
+                  <VerifyButton issueId={issue.id} />
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
-      {/* Issue list */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {isHead ? "All Issues" : "Assigned to Me"}
-        </h2>
-        <AuthorityIssueList
-          initialIssues={allIssues}
-          userId={user.id}
-          municipalityName={user.municipalityName}
-          isEmployee={!isHead}
-          isHead={isHead}
-        />
-      </section>
-
       {/* Needs attention */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">Needs Attention</h2>
-          <Badge variant="secondary">{attentionIssues.length}</Badge>
-        </div>
-        {attentionIssues.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nothing waiting too long — every open issue is within its attention window.
-          </p>
-        ) : (
+      {attentionIssues.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-nilo">Needs Attention</h2>
+            <Badge variant="secondary">{attentionIssues.length}</Badge>
+          </div>
           <div className="space-y-2">
             {attentionIssues.map((issue) => {
               const borderClass =
@@ -290,17 +235,8 @@ export default async function AuthorityDashboardPage() {
                   ? "border-l-4 border-red-500"
                   : "border-l-4 border-amber-500";
               return (
-                <Link
-                  key={issue.id}
-                  href={`/authority/issues/${issue.id}`}
-                  className="block"
-                >
-                  <Card
-                    className={cn(
-                      "p-3 transition-colors hover:bg-muted/40",
-                      borderClass
-                    )}
-                  >
+                <Link key={issue.id} href={`/authority/issues/${issue.id}`} className="block">
+                  <Card className={cn("p-3 transition-colors hover:bg-muted/40", borderClass)}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
@@ -328,8 +264,8 @@ export default async function AuthorityDashboardPage() {
               );
             })}
           </div>
-        )}
-      </section>
-    </div>
+        </section>
+      )}
+    </AuthorityIssueMap>
   );
 }

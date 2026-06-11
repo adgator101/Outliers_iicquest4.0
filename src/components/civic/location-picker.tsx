@@ -7,8 +7,7 @@ import { MapPin, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLE_URL } from "@/lib/mapbox";
 // Default center: Kathmandu
 const DEFAULT_LAT = 27.7172;
 const DEFAULT_LNG = 85.324;
@@ -41,7 +40,7 @@ export function LocationPicker({
   }
 
   // ── Fallback: no Mapbox token → manual lat/lng inputs ──────────────────────
-  if (!MAPBOX_TOKEN) {
+  if (!MAPBOX_ACCESS_TOKEN) {
     return (
       <div className="space-y-3 rounded-lg border border-dashed p-3">
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -101,8 +100,8 @@ export function LocationPicker({
           {...viewState}
           onMove={(e) => setViewState(e.viewState)}
           onClick={handleMapClick}
-          mapboxAccessToken={MAPBOX_TOKEN}
-          mapStyle="mapbox://styles/mapbox/streets-v12"
+          mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
+          mapStyle={MAPBOX_STYLE_URL}
           style={{ width: "100%", height: "100%" }}
         >
           <NavigationControl position="top-right" />

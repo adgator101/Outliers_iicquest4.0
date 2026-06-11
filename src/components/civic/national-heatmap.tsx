@@ -14,9 +14,9 @@ import type { ExpressionSpecification } from "mapbox-gl";
 import { MapPin } from "lucide-react";
 import type { FeatureCollection, Point } from "geojson";
 import { statusLabel } from "@/lib/utils";
+import { PRIORITY_COLORS, PRIORITY_ORDER } from "@/lib/issue-colors";
 import type { IssueStatus, Priority } from "@/generated/prisma/client";
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLE_URL } from "@/lib/mapbox";
 
 // Center of Nepal
 const NEPAL_CENTER = { latitude: 28.3949, longitude: 84.124, zoom: 6 };
@@ -33,26 +33,12 @@ export type HeatmapIssue = {
   municipalityName: string | null;
 };
 
-const PRIORITY_LEGEND: { label: string; color: string }[] = [
-  { label: "Critical", color: "#dc2626" },
-  { label: "High", color: "#ea580c" },
-  { label: "Medium", color: "#ca8a04" },
-  { label: "Low", color: "#16a34a" },
-];
-
 const circleColor: ExpressionSpecification = [
   "match",
   ["get", "priority"],
-  "CRITICAL",
-  "#dc2626",
-  "HIGH",
-  "#ea580c",
-  "MEDIUM",
-  "#ca8a04",
-  "LOW",
-  "#16a34a",
+  ...PRIORITY_ORDER.flatMap((p) => [p, PRIORITY_COLORS[p]]),
   "#64748b",
-];
+] as ExpressionSpecification;
 
 // communityImpactScore (0–1) → radius 6px–20px
 const circleRadius: ExpressionSpecification = [
@@ -90,7 +76,7 @@ export function NationalHeatmap({ issues }: { issues: HeatmapIssue[] }) {
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [cursor, setCursor] = useState<string>("");
 
-  if (!MAPBOX_TOKEN) {
+  if (!MAPBOX_ACCESS_TOKEN) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-10 text-center">
         <MapPin className="size-6 text-muted-foreground" />
@@ -126,8 +112,8 @@ export function NationalHeatmap({ issues }: { issues: HeatmapIssue[] }) {
       <div className="h-[620px] w-full overflow-hidden rounded-lg border">
         <Map
           initialViewState={NEPAL_CENTER}
-          mapboxAccessToken={MAPBOX_TOKEN}
-          mapStyle="mapbox://styles/mapbox/light-v11"
+          mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
+          mapStyle={MAPBOX_STYLE_URL}
           style={{ width: "100%", height: "100%" }}
           interactiveLayerIds={[LAYER_ID]}
           cursor={cursor}
@@ -187,13 +173,13 @@ export function NationalHeatmap({ issues }: { issues: HeatmapIssue[] }) {
       {/* Priority legend */}
       <div className="flex flex-wrap items-center gap-4">
         <span className="text-xs font-medium text-muted-foreground">Priority</span>
-        {PRIORITY_LEGEND.map((p) => (
-          <span key={p.label} className="flex items-center gap-1.5 text-xs">
+        {PRIORITY_ORDER.map((p) => (
+          <span key={p} className="flex items-center gap-1.5 text-xs">
             <span
               className="size-3 rounded-full"
-              style={{ backgroundColor: p.color }}
+              style={{ backgroundColor: PRIORITY_COLORS[p] }}
             />
-            {p.label}
+            {p.charAt(0) + p.slice(1).toLowerCase()}
           </span>
         ))}
         <span className="text-xs text-muted-foreground">

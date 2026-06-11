@@ -98,7 +98,7 @@ function EmployeeRow({ e, perf }: { e: Employee; perf?: EmployeePerformance }) {
         className={cn(
           "rounded-full px-2 py-0.5 text-xs font-medium",
           e.isActive
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+            ? "bg-status-resolved/10 text-status-resolved"
             : "bg-muted text-muted-foreground"
         )}
       >
@@ -144,10 +144,10 @@ export default async function TeamPage() {
   const groups = groupByWard(employees);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-5">
+    <div className="w-full space-y-8 px-4 py-6 sm:px-6 lg:px-10">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-nilo/15 pb-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Team</h1>
           <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
             <Users2 className="size-4 shrink-0" />
             {activeCount} active {activeCount === 1 ? "officer" : "officers"}
@@ -185,7 +185,7 @@ export default async function TeamPage() {
               >
                 <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-                  <span className="font-medium">{group.label}</span>
+                  <span className="font-heading text-base font-semibold">{group.label}</span>
                   <span className="text-sm text-muted-foreground">
                     {activeInGroup} {activeInGroup === 1 ? "officer" : "officers"}
                     {group.employees.length !== activeInGroup

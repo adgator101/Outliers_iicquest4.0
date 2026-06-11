@@ -8,13 +8,6 @@ import { Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, roleHomePath } from "@/lib/roles";
 import type { Role } from "@/generated/prisma/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,12 +73,16 @@ export default function RegisterPage() {
   const isCitizen = role === "CITIZEN";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Create your account</CardTitle>
-        <CardDescription>Join CivicChain Nepal to report and track civic issues.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Create your account
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Join CivicChain Nepal to report and track civic issues.
+        </p>
+      </div>
+      <div>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Full name</Label>
@@ -208,7 +205,7 @@ export default function RegisterPage() {
             Log in
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

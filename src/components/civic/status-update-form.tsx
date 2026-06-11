@@ -6,24 +6,12 @@ import { toast } from "sonner";
 import { Loader2, ImagePlus, X } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { updateIssueStatusAction } from "@/lib/actions/issues";
+import { uploadImagesToCloudinary } from "@/lib/upload-client";
 import { statusLabel } from "@/lib/utils";
 import type { IssueStatus } from "@/generated/prisma/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-
-async function uploadImages(files: File[]): Promise<string[]> {
-  if (files.length === 0) return [];
-  const fd = new FormData();
-  files.forEach((f) => fd.append("files", f));
-  const res = await fetch("/api/uploads", { method: "POST", body: fd });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "Image upload failed");
-  }
-  const data = (await res.json()) as { urls: string[] };
-  return data.urls;
-}
 
 export function StatusUpdateForm({
   issueId,
@@ -61,7 +49,10 @@ export function StatusUpdateForm({
     if (!target) return;
     setUploading(true);
     try {
-      const images = await uploadImages(files);
+      // Direct parallel upload to Cloudinary — no server middleman (see upload-client.ts)
+      const images = files.length > 0
+        ? await uploadImagesToCloudinary(files, "civicchain/updates")
+        : [];
       execute({ issueId, status: target, comment: comment || undefined, images });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");

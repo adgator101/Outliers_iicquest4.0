@@ -48,18 +48,7 @@ type Defaults = {
   provinceName: string | null;
 };
 
-async function uploadImages(files: File[]): Promise<string[]> {
-  if (files.length === 0) return [];
-  const fd = new FormData();
-  files.forEach((f) => fd.append("files", f));
-  const res = await fetch("/api/uploads", { method: "POST", body: fd });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "Image upload failed");
-  }
-  const data = (await res.json()) as { urls: string[] };
-  return data.urls;
-}
+import { uploadImageViaServer } from "@/lib/upload-client";
 
 export function ReportForm({ defaults }: { defaults: Defaults }) {
   const [title, setTitle] = useState("");
@@ -67,7 +56,8 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
   const [category, setCategory] = useState<Category>(Category.INFRASTRUCTURE);
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState<LatLng | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
+  // Each entry: File for preview + URL once uploaded (or null while uploading).
+  const [images, setImages] = useState<{ file: File; url: string | null; uploading: boolean }[]>([]);
   const [ward, setWard] = useState(defaults.wardNumber ? String(defaults.wardNumber) : "");
   const [municipality, setMunicipality] = useState(defaults.municipalityName ?? "");
   const [district, setDistrict] = useState(defaults.districtName ?? "");
@@ -81,17 +71,41 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
     Extract<ClusterResult, { outcome: "needs_decision" }> | null
   >(null);
 
-  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+  // Upload immediately on pick — URL is ready by the time user hits submit.
+  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
-    setFiles((prev) => [...prev, ...picked].slice(0, 5));
     e.target.value = "";
+    const remaining = 5 - images.length;
+    const toAdd = picked.slice(0, remaining);
+    if (toAdd.length === 0) return;
+
+    // Add placeholders immediately so thumbnails appear.
+    const placeholders = toAdd.map((file) => ({ file, url: null, uploading: true }));
+    setImages((prev) => [...prev, ...placeholders]);
+
+    // Upload each in parallel.
+    await Promise.all(
+      toAdd.map(async (file) => {
+        try {
+          const url = await uploadImageViaServer(file, "civicchain/reports");
+          setImages((prev) =>
+            prev.map((img) =>
+              img.file === file ? { file, url, uploading: false } : img
+            )
+          );
+        } catch {
+          toast.error(`Failed to upload ${file.name} — try again.`);
+          setImages((prev) => prev.filter((img) => img.file !== file));
+        }
+      })
+    );
   }
 
-  function removeFile(idx: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  function removeImage(idx: number) {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function buildInput(images: string[]): CreateReportInput {
+  function buildInput(imageUrls: string[]): CreateReportInput {
     return {
       title,
       description,
@@ -103,7 +117,7 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
       municipalityName: municipality || undefined,
       districtName: district || undefined,
       provinceName: province || undefined,
-      images,
+      images: imageUrls,
     };
   }
 
@@ -113,10 +127,16 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
       toast.error("Please set the issue location on the map.");
       return;
     }
+    // If any image is still uploading, wait rather than block submission.
+    const stillUploading = images.some((img) => img.uploading);
+    if (stillUploading) {
+      toast.error("Photos are still uploading — please wait a moment.");
+      return;
+    }
+    const uploadedUrls = images.map((img) => img.url).filter((u): u is string => u !== null);
     setSubmitting(true);
     try {
-      const images = await uploadImages(files);
-      const input = buildInput(images);
+      const input = buildInput(uploadedUrls);
       const res = await createReportAction(input);
 
       if (res?.serverError) {
@@ -185,7 +205,7 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
     setCategory(Category.INFRASTRUCTURE);
     setAddress("");
     setLocation(null);
-    setFiles([]);
+    setImages([]);
     setResult(null);
     setPendingInput(null);
     setCandidate(null);
@@ -358,17 +378,27 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
         <div className="space-y-2">
           <Label>Photos (optional, up to 5)</Label>
           <div className="flex flex-wrap gap-3">
-            {files.map((file, idx) => (
+            {images.map((img, idx) => (
               <div key={idx} className="relative size-20 overflow-hidden rounded-md border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={URL.createObjectURL(file)}
-                  alt={file.name}
+                  src={URL.createObjectURL(img.file)}
+                  alt={img.file.name}
                   className="size-full object-cover"
                 />
+                {img.uploading && (
+                  <div className="absolute inset-0 grid place-items-center bg-background/60">
+                    <Loader2 className="size-4 animate-spin text-foreground" />
+                  </div>
+                )}
+                {!img.uploading && img.url && (
+                  <div className="absolute left-0.5 top-0.5 rounded-full bg-emerald-500/90 p-0.5">
+                    <CheckCircle2 className="size-3 text-white" />
+                  </div>
+                )}
                 <button
                   type="button"
-                  onClick={() => removeFile(idx)}
+                  onClick={() => removeImage(idx)}
                   className="absolute right-0.5 top-0.5 rounded-full bg-background/80 p-0.5"
                   aria-label="Remove image"
                 >
@@ -376,7 +406,7 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
                 </button>
               </div>
             ))}
-            {files.length < 5 && (
+            {images.length < 5 && (
               <label className="grid size-20 cursor-pointer place-items-center rounded-md border border-dashed text-muted-foreground hover:bg-muted/40">
                 <ImagePlus className="size-5" />
                 <input
@@ -389,6 +419,9 @@ export function ReportForm({ defaults }: { defaults: Defaults }) {
               </label>
             )}
           </div>
+          {images.some((img) => img.uploading) && (
+            <p className="text-xs text-muted-foreground">Uploading photos…</p>
+          )}
         </div>
 
         <Button type="submit" className="w-full" disabled={submitting}>

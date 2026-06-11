@@ -33,7 +33,7 @@ export function OfficerContactCard({
         Office contact
       </p>
       <div className="flex items-center gap-3">
-        <div className="grid size-11 shrink-0 place-items-center rounded-full bg-muted text-sm font-medium">
+        <div className="grid size-11 shrink-0 place-items-center rounded-full bg-nilo/10 text-sm font-medium text-nilo">
           {initials(name)}
         </div>
         <div className="min-w-0 flex-1">

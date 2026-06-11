@@ -17,6 +17,9 @@ export const assignIssueSchema = z.object({
 export const verifyIssueSchema = z.object({
   issueId: z.string().cuid(),
   type: z.enum(["CONFIRM", "DISPUTE"]),
+  proofImages: z.array(z.string()).max(3).default([]),
+  proofLatitude: z.number().optional(),
+  proofLongitude: z.number().optional(),
 });
 
 export const createRootIssueSchema = z.object({

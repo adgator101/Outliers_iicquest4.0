@@ -9,11 +9,12 @@ import {
 import { prisma } from "@/lib/prisma";
 import { analyzeReport } from "@/lib/ai/analyze-report";
 import { Category, IssueStatus, Priority } from "@/generated/prisma/client";
-import { computeImpact, haversineDistance, maxPriority } from "@/lib/utils";
-import { detectCascadeLink } from "@/lib/causal-graph";
+import { computeImpact, haversineDistance, maxPriority, daysSince } from "@/lib/utils";
+import { detectCascadeWithAI } from "@/lib/ai/detect-cascade";
 import type { ReportAIAnalysis, ClusterResult } from "@/types";
 
 const GEO_RADIUS_METERS = 50;
+const SEMANTIC_MERGE_RADIUS_METERS = 200; // AI auto-merge only within this range
 const OPEN_STATUSES = [
   IssueStatus.SUBMITTED,
   IssueStatus.VERIFIED,
@@ -139,8 +140,7 @@ async function createNewIssueFromReport(
     },
   });
 
-  // Cascade detection (STORY-010): is this new issue a downstream effect of an
-  // existing nearby upstream issue? Best-effort — never blocks submission.
+  // Cascade detection (STORY-014): AI-driven causal chain detection.
   await detectAndLinkCascade(issue);
 
   return {
@@ -151,29 +151,35 @@ async function createNewIssueFromReport(
   };
 }
 
-// Looks for an upstream cause among nearby open issues and, if found, records a
-// directed IssueChainLink and joins the new issue to that chain.
+// Detects whether the new issue is a downstream causal effect of any nearby
+// open issues. Uses Gemini for flexible chain reasoning (dam breach → flooding
+// → garbage → mosquitoes etc.) with a simple same-category proximity fallback
+// when the AI call fails. Best-effort — never blocks report submission.
 async function detectAndLinkCascade(issue: {
   id: string;
+  title: string;
+  description: string;
   category: Category;
   latitude: number;
   longitude: number;
   createdAt: Date;
   municipalityName: string | null;
 }): Promise<void> {
+  const CASCADE_RADIUS_METERS = 500;
+  const CASCADE_WINDOW_DAYS = 14;
+
   try {
     const candidates = await prisma.issue.findMany({
       where: {
         status: { in: OPEN_STATUSES },
         id: { not: issue.id },
-        ...(issue.municipalityName
-          ? { municipalityName: issue.municipalityName }
-          : {}),
+        ...(issue.municipalityName ? { municipalityName: issue.municipalityName } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
         id: true,
+        title: true,
         category: true,
         latitude: true,
         longitude: true,
@@ -182,24 +188,74 @@ async function detectAndLinkCascade(issue: {
       },
     });
 
-    const link = detectCascadeLink(issue, candidates);
-    if (!link) return;
+    // Pre-filter to the spatial + temporal window before calling AI.
+    const nearby = candidates.filter((c) => {
+      const dist = haversineDistance(issue.latitude, issue.longitude, c.latitude, c.longitude);
+      const age = daysSince(c.createdAt);
+      return dist <= CASCADE_RADIUS_METERS && age <= CASCADE_WINDOW_DAYS;
+    });
+
+    if (nearby.length === 0) return;
+
+    const candidatesForAI = nearby.map((c) => ({
+      id: c.id,
+      title: c.title,
+      category: c.category as string,
+      distanceMeters: Math.round(
+        haversineDistance(issue.latitude, issue.longitude, c.latitude, c.longitude)
+      ),
+      ageDays: Math.round(daysSince(c.createdAt)),
+    }));
+
+    // Primary: AI causal reasoning.
+    let aiResult = await detectCascadeWithAI(
+      { title: issue.title, description: issue.description, category: issue.category as string },
+      candidatesForAI
+    );
+    let source = "ai";
+
+    // Fallback: if AI returned nothing, use the closest same-category issue in range.
+    if (!aiResult) {
+      const sameCategory = nearby.filter((c) => c.category === issue.category);
+      const closest = sameCategory.sort(
+        (a, b) =>
+          haversineDistance(issue.latitude, issue.longitude, a.latitude, a.longitude) -
+          haversineDistance(issue.latitude, issue.longitude, b.latitude, b.longitude)
+      )[0];
+      if (closest) {
+        source = "rule";
+        aiResult = {
+          upstreamIssueId: closest.id,
+          reasoning: "Same category, within 500m and reported in the last 14 days.",
+          confidence: 0.6,
+        };
+      }
+    }
+
+    if (!aiResult) return;
+
+    const upstream = nearby.find((c) => c.id === aiResult!.upstreamIssueId);
+    if (!upstream) return;
+
+    const chainRootIssueId = upstream.chainRootIssueId ?? upstream.id;
 
     await prisma.$transaction([
       prisma.issueChainLink.create({
         data: {
-          upstreamIssueId: link.upstreamIssueId,
+          upstreamIssueId: aiResult.upstreamIssueId,
           downstreamIssueId: issue.id,
-          confidence: link.confidence,
+          confidence: aiResult.confidence,
+          reason: aiResult.reasoning,
+          source,
         },
       }),
       prisma.issue.update({
         where: { id: issue.id },
-        data: { chainRootIssueId: link.chainRootIssueId },
+        data: { chainRootIssueId },
       }),
     ]);
   } catch {
-    // Detection is non-critical; a failure must not break report submission.
+    // Best-effort — never block report submission.
   }
 }
 
@@ -255,7 +311,6 @@ export const createReportAction = authActionClient
       );
     }
 
-    // ── Step 2: Semantic similarity (AI fallback) ────────────────────────────
     const nearbyIssues = await prisma.issue.findMany({
       where: {
         status: { in: OPEN_STATUSES },
@@ -280,7 +335,22 @@ export const createReportAction = authActionClient
     const dupId = aiResult.duplicateIssueId;
     const dupExists = dupId && nearbyIssues.some((i) => i.id === dupId);
 
-    if (dupId && dupExists && sim >= 0.8) {
+    // Guard: semantic auto-merge only fires if the matched issue is within
+    // SEMANTIC_MERGE_RADIUS_METERS. Beyond that, even a high-confidence AI
+    // match is a prompt, not a silent merge — 1.5km away is a different place.
+    const matchedIssue = dupId ? nearbyIssues.find((i) => i.id === dupId) : null;
+    const matchDistance =
+      matchedIssue
+        ? haversineDistance(
+            parsedInput.latitude,
+            parsedInput.longitude,
+            matchedIssue.latitude,
+            matchedIssue.longitude
+          )
+        : Infinity;
+    const withinMergeRadius = matchDistance <= SEMANTIC_MERGE_RADIUS_METERS;
+
+    if (dupId && dupExists && sim >= 0.8 && withinMergeRadius) {
       return attachReportToIssue(
         dupId,
         parsedInput,
@@ -290,6 +360,7 @@ export const createReportAction = authActionClient
       );
     }
 
+    // For ≥0.80 but outside merge radius, treat same as 0.50–0.79 — ask citizen.
     if (dupId && dupExists && sim >= 0.5) {
       // 0.50–0.79 → prompt the citizen, do NOT write anything yet.
       const candidate = await prisma.issue.findUniqueOrThrow({

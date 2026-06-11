@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPin, Layers, UserCheck, FileText, GitBranch } from "lucide-react";
+import { ArrowLeft, MapPin, Layers, UserCheck, FileText } from "lucide-react";
 import { requireRole } from "@/lib/session";
 import { Role, IssueStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -19,6 +19,7 @@ import { AssignIssueDialog } from "@/components/civic/assign-issue-dialog";
 import { StatusUpdateForm } from "@/components/civic/status-update-form";
 import { DeadlineForm } from "@/components/civic/deadline-form";
 import { CascadeResolveCard } from "@/components/civic/cascade-resolve-card";
+import { CascadeLinkBanner } from "@/components/civic/cascade-link-banner";
 
 const ALLOWED_NEXT: Partial<Record<IssueStatus, IssueStatus[]>> = {
   ASSIGNED: [IssueStatus.IN_PROGRESS],
@@ -64,7 +65,10 @@ export default async function AuthorityIssueDetailPage({
       rootIssue: { select: { id: true, title: true } },
       downstreamLinks: {
         select: {
-          upstreamIssue: { select: { id: true, title: true, createdAt: true } },
+          reason: true,
+          source: true,
+          confidence: true,
+          upstreamIssue: { select: { id: true, title: true } },
         },
         take: 1,
       },
@@ -84,7 +88,7 @@ export default async function AuthorityIssueDetailPage({
     (isHead ||
       (!!me?.isSectionHead &&
         me.department === categoryToDepartment(issue.category)));
-  const upstream = issue.downstreamLinks[0]?.upstreamIssue ?? null;
+  const cascadeLink = issue.downstreamLinks[0] ?? null;
   const downstreamOpen =
     issue.status === IssueStatus.RESOLVED
       ? await getDownstreamOpenIssues(issue.id)
@@ -146,22 +150,16 @@ export default async function AuthorityIssueDetailPage({
       )}
 
       {/* Upstream cause banner */}
-      {upstream && (
-        <Card className="flex items-center gap-2 border-l-4 border-amber-500 p-4 text-sm">
-          <GitBranch className="size-4 shrink-0 text-amber-600" />
-          <span>
-            May be caused by:{" "}
-            <Link
-              href={`/authority/issues/${upstream.id}`}
-              className="font-medium underline underline-offset-4"
-            >
-              {upstream.title}
-            </Link>{" "}
-            <span className="text-muted-foreground">
-              (reported {formatRelativeTime(new Date(upstream.createdAt))})
-            </span>
-          </span>
-        </Card>
+      {cascadeLink && (
+        <CascadeLinkBanner
+          upstream={cascadeLink.upstreamIssue}
+          reason={cascadeLink.reason}
+          source={cascadeLink.source}
+          confidence={cascadeLink.confidence}
+          downstreamIssueId={issue.id}
+          canRemove={isHead}
+          hrefBase="/authority/issues"
+        />
       )}
 
       {/* Cascade resolve — RESOLVED upstream with open downstream */}

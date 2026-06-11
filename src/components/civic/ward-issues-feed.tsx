@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Map as MapIcon, List as ListIcon } from "lucide-react";
 import { IssueCard, type IssueCardData } from "./issue-card";
+import { CitizenIssueMap } from "./citizen-issue-map";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const STATUS_TABS: { value: string; label: string }[] = [
@@ -22,6 +25,7 @@ export function WardIssuesFeed({
   municipality: string | null;
 }) {
   const [status, setStatus] = useState<string>("ALL");
+  const [view, setView] = useState<"list" | "map">("list");
   const [issues, setIssues] = useState<IssueCardData[]>(initialIssues);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -61,28 +65,54 @@ export function WardIssuesFeed({
 
   return (
     <div className="space-y-4">
-      <Tabs value={status} onValueChange={(v) => setStatus(String(v))}>
-        <TabsList className="flex-wrap">
-          {STATUS_TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {/* List / Map view toggle */}
+      <div className="flex gap-1.5">
+        <Button
+          size="sm"
+          variant={view === "list" ? "default" : "outline"}
+          onClick={() => setView("list")}
+        >
+          <ListIcon className="size-4" />
+          List
+        </Button>
+        <Button
+          size="sm"
+          variant={view === "map" ? "default" : "outline"}
+          onClick={() => setView("map")}
+        >
+          <MapIcon className="size-4" />
+          Map
+        </Button>
+      </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading issues…</p>
-      ) : issues.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No issues found in your ward.
-        </p>
+      {view === "map" ? (
+        <CitizenIssueMap ward={ward} municipality={municipality} />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {issues.map((issue) => (
-            <IssueCard key={issue.id} issue={issue} href={`/issues/${issue.id}`} />
-          ))}
-        </div>
+        <>
+          <Tabs value={status} onValueChange={(v) => setStatus(String(v))}>
+            <TabsList className="flex-wrap">
+              {STATUS_TABS.map((t) => (
+                <TabsTrigger key={t.value} value={t.value}>
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading issues…</p>
+          ) : issues.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No issues found in your ward.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {issues.map((issue) => (
+                <IssueCard key={issue.id} issue={issue} href={`/issues/${issue.id}`} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

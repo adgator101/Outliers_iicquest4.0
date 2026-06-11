@@ -13,6 +13,7 @@ import {
   BadgeCheck,
   ShieldAlert,
   Wrench,
+  ImageOff,
 } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { verifyIssueAction } from "@/lib/actions/issues";
@@ -56,11 +57,13 @@ function initials(name: string | null) {
 export function ResolutionReview({
   issueId,
   myVote,
+  beforeImages,
   officerEvidence,
   votes,
 }: {
   issueId: string;
   myVote: Vote;
+  beforeImages: string[];
   officerEvidence: {
     content: string;
     images: string[];
@@ -130,32 +133,80 @@ export function ResolutionReview({
   const fixed = votes.filter((v) => v.type === "CONFIRM");
   const broken = votes.filter((v) => v.type === "DISPUTE");
 
+  const beforeImage = beforeImages[0] ?? null;
+  const afterImages = officerEvidence?.images ?? [];
+  const afterImage = afterImages[0] ?? null;
+
   return (
     <div className="space-y-5">
-      {/* What the officer claims — their resolution evidence, shown openly */}
-      {officerEvidence && (
-        <div className="rounded-xl bg-emerald-500/[0.07] p-4 ring-1 ring-emerald-500/15">
-          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-            <Wrench className="size-3.5" />
-            Marked resolved
-            {officerEvidence.authorName ? ` by ${officerEvidence.authorName}` : ""}
-            <span className="font-normal text-muted-foreground">
-              · {formatRelativeTime(new Date(officerEvidence.at))}
-            </span>
-          </p>
-          {officerEvidence.content && (
-            <p className="mt-2 text-sm text-foreground/85">{officerEvidence.content}</p>
-          )}
-          {officerEvidence.images.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {officerEvidence.images.map((src) => (
+      {/* Before / After — the heart of the review */}
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          {/* Before */}
+          <figure className="space-y-1.5">
+            <div className="relative aspect-square overflow-hidden rounded-xl border bg-muted">
+              {beforeImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={src} src={src} alt="Resolution evidence" className="size-24 rounded-lg border object-cover" />
-              ))}
+                <img src={beforeImage} alt="Before — when reported" className="size-full object-cover" />
+              ) : (
+                <div className="grid size-full place-items-center text-center text-xs text-muted-foreground">
+                  <span>
+                    <ImageOff className="mx-auto mb-1 size-5" />
+                    No report photo
+                  </span>
+                </div>
+              )}
+              <span className="absolute left-2 top-2 rounded-full bg-nilo/90 px-2 py-0.5 text-[11px] font-medium text-white">
+                Before
+              </span>
             </div>
-          )}
+            <figcaption className="text-center text-xs text-muted-foreground">When reported</figcaption>
+          </figure>
+
+          {/* After */}
+          <figure className="space-y-1.5">
+            <div className="relative aspect-square overflow-hidden rounded-xl border bg-muted">
+              {afterImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={afterImage} alt="After — officer's proof" className="size-full object-cover" />
+              ) : (
+                <div className="grid size-full place-items-center text-center text-xs text-muted-foreground">
+                  <span>
+                    <ImageOff className="mx-auto mb-1 size-5" />
+                    No proof photo
+                  </span>
+                </div>
+              )}
+              <span className="absolute left-2 top-2 rounded-full bg-emerald-600/90 px-2 py-0.5 text-[11px] font-medium text-white">
+                After
+              </span>
+            </div>
+            <figcaption className="text-center text-xs text-muted-foreground">Officer&apos;s proof</figcaption>
+          </figure>
         </div>
-      )}
+
+        {/* Extra after photos, if any */}
+        {afterImages.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {afterImages.slice(1).map((src) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={src} src={src} alt="Additional proof" className="size-14 rounded-md border object-cover" />
+            ))}
+          </div>
+        )}
+
+        {/* Who marked it resolved + their note */}
+        {officerEvidence && (
+          <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+            <Wrench className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="font-medium text-foreground/80">
+              Marked resolved{officerEvidence.authorName ? ` by ${officerEvidence.authorName}` : ""}
+            </span>
+            · {formatRelativeTime(new Date(officerEvidence.at))}
+            {officerEvidence.content ? <span className="w-full">{officerEvidence.content}</span> : null}
+          </p>
+        )}
+      </div>
 
       {/* Your verdict */}
       <div className="space-y-2.5">

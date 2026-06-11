@@ -23,6 +23,7 @@ import { IssueTimeline } from "./issue-timeline";
 import { RequestStatePanel } from "./request-officer-dialog";
 import { AssignmentRequestActions } from "./assignment-request-actions";
 import { StatusUpdateForm } from "./status-update-form";
+import { UpdateDueDateForm } from "./update-due-date-form";
 import type {
   Category,
   Department,
@@ -258,6 +259,17 @@ export function AuthorityIssueDetailPanel({
                   />
                 )}
               </div>
+
+              {/* Completion date update — every change writes history to timeline */}
+              {detail.assignedTo && (
+                <>
+                  <Separator />
+                  <UpdateDueDateForm
+                    issueId={detail.id}
+                    currentDueDate={detail.dueDate ? new Date(detail.dueDate) : null}
+                  />
+                </>
+              )}
 
               {allowedNext.length > 0 && (
                 <>

@@ -417,6 +417,59 @@ export const cancelAssignmentRequestAction = roleActionClient([
     return { issue: updated };
   });
 
+// Update the committed completion date — always records a timeline entry so
+// citizens can see the full history of date changes ("was X, now Y").
+export const updateDueDateAction = roleActionClient([
+  Role.LOCAL_BODY_EMPLOYEE,
+  Role.LOCAL_BODY_HEAD,
+])
+  .schema(z.object({ issueId: z.string().min(1), dueDate: z.string().datetime() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const actor = await prisma.user.findUniqueOrThrow({
+      where: { id: String(ctx.user.id) },
+      select: { municipalityName: true, name: true },
+    });
+    const issue = await prisma.issue.findUniqueOrThrow({
+      where: { id: parsedInput.issueId },
+      select: { municipalityName: true, dueDate: true },
+    });
+    if (actor.municipalityName && issue.municipalityName !== actor.municipalityName) {
+      throw new Error("That issue is not in your municipality.");
+    }
+
+    const newDate = new Date(parsedInput.dueDate);
+    const fmt = (d: Date | string | null) =>
+      d
+        ? new Date(d).toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })
+        : "none";
+
+    const content =
+      issue.dueDate
+        ? `Completion date updated: was ${fmt(issue.dueDate)}, now ${fmt(newDate)}.`
+        : `Completion date committed: ${fmt(newDate)}.`;
+
+    const [updated] = await prisma.$transaction([
+      prisma.issue.update({
+        where: { id: parsedInput.issueId },
+        data: { dueDate: newDate },
+      }),
+      prisma.issueUpdate.create({
+        data: {
+          issueId: parsedInput.issueId,
+          authorId: String(ctx.user.id),
+          content,
+          images: [],
+        },
+      }),
+    ]);
+
+    return { issue: updated };
+  });
+
 export const createRootIssueAction = roleActionClient([Role.LOCAL_BODY_HEAD])
   .schema(createRootIssueSchema)
   .action(async ({ parsedInput }) => {

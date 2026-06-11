@@ -18,6 +18,7 @@ import { IssueTimeline } from "@/components/civic/issue-timeline";
 import { RequestStatePanel } from "@/components/civic/request-officer-dialog";
 import { AssignmentRequestActions } from "@/components/civic/assignment-request-actions";
 import { StatusUpdateForm } from "@/components/civic/status-update-form";
+import { UpdateDueDateForm } from "@/components/civic/update-due-date-form";
 import { CascadeResolveCard } from "@/components/civic/cascade-resolve-card";
 import { CascadeLinkBanner } from "@/components/civic/cascade-link-banner";
 
@@ -213,6 +214,13 @@ export default async function AuthorityIssueDetailPage({
             />
           )}
         </div>
+
+        <Separator />
+
+        {/* Completion date — officer or section-head can set/change; every change recorded */}
+        {issue.assignedTo && (
+          <UpdateDueDateForm issueId={issue.id} currentDueDate={issue.dueDate} />
+        )}
 
         <Separator />
 

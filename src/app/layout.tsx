@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Khand, Mukta } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaProvider } from "@/components/pwa/pwa-provider";
 
 const mukta = Mukta({
   variable: "--font-mukta",
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col">
         {children}
         <Toaster richColors position="top-center" />
+        <PwaProvider />
       </body>
     </html>
   );

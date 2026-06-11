@@ -7,11 +7,11 @@ export default async function ExecutiveLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole([Role.EXECUTIVE_BODY]);
+  const user = await requireRole([Role.EXECUTIVE_BODY]);
 
   return (
     <div className="flex min-h-screen flex-col">
-      <TopNav />
+      <TopNav user={user} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
     </div>
   );

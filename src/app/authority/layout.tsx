@@ -7,11 +7,11 @@ export default async function AuthorityLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole([Role.LOCAL_BODY_EMPLOYEE, Role.LOCAL_BODY_HEAD]);
+  const user = await requireRole([Role.LOCAL_BODY_EMPLOYEE, Role.LOCAL_BODY_HEAD]);
 
   return (
     <div className="flex min-h-screen flex-col">
-      <TopNav />
+      <TopNav user={user} />
       <main className="flex-1">{children}</main>
     </div>
   );

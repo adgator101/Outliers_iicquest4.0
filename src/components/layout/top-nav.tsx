@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, PlusCircle, Users2 } from "lucide-react";
-import { authClient, useSession } from "@/lib/auth-client";
+import { LogOut, LayoutDashboard, PlusCircle, Users2, BadgeCheck, User } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import { roleHomePath } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -26,11 +28,22 @@ type Role =
   | "LOCAL_BODY_HEAD"
   | "EXECUTIVE_BODY";
 
+// Server-provided user — comes from requireRole() in the layout, so it is always
+// the DB-verified identity for the request. Never trust the client-side session
+// for role-gated display decisions.
+export type NavUser = {
+  name: string;
+  email: string;
+  role: Role;
+  municipalityName?: string | null;
+};
+
 function navLinksForRole(role: Role): { href: string; label: string; icon: React.ReactNode }[] {
   switch (role) {
     case "CITIZEN":
       return [
         { href: "/dashboard", label: "My Dashboard", icon: <LayoutDashboard className="size-4" /> },
+        { href: "/verify", label: "Verify", icon: <BadgeCheck className="size-4" /> },
         { href: "/report", label: "Report Issue", icon: <PlusCircle className="size-4" /> },
       ];
     case "LOCAL_BODY_EMPLOYEE":
@@ -49,14 +62,11 @@ function navLinksForRole(role: Role): { href: string; label: string; icon: React
   }
 }
 
-export function TopNav() {
+export function TopNav({ user }: { user?: NavUser }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: session, isPending } = useSession();
-  const user = session?.user as
-    | { name: string; email: string; role?: Role; municipalityName?: string | null }
-    | undefined;
-  const role = (user?.role ?? "CITIZEN") as Role;
+
+  const role = user?.role ?? "CITIZEN";
   const links = user ? navLinksForRole(role) : [];
 
   async function handleSignOut() {
@@ -75,7 +85,7 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="transition-opacity hover:opacity-80">
+        <Link href={user ? roleHomePath(user.role) : "/"} className="transition-opacity hover:opacity-80">
           <BrandMark />
         </Link>
 
@@ -100,7 +110,7 @@ export function TopNav() {
             );
           })}
 
-          {isPending ? null : user ? (
+          {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -114,19 +124,27 @@ export function TopNav() {
                 }
               />
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <div className="flex flex-col">
-                    <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs font-normal text-muted-foreground">
-                      {user.email}
-                    </span>
-                    <span className="mt-1 text-xs font-normal text-muted-foreground">
-                      {role.replaceAll("_", " ")}
-                      {user.municipalityName ? ` · ${user.municipalityName}` : ""}
-                    </span>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="truncate font-medium">{user.name}</span>
+                      <span className="truncate text-xs font-normal text-muted-foreground">
+                        {user.email}
+                      </span>
+                      <span className="mt-1 text-xs font-normal text-muted-foreground">
+                        {role.replaceAll("_", " ")}
+                        {user.municipalityName ? ` · ${user.municipalityName}` : ""}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                {role === "CITIZEN" && (
+                  <DropdownMenuItem render={<Link href="/profile" />}>
+                    <User className="size-4" />
+                    My profile
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="size-4" />
                   Sign out

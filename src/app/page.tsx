@@ -3,6 +3,7 @@ import { GitMerge, Users, Network, MapPin } from "lucide-react";
 import { TopNav } from "@/components/layout/top-nav";
 import { BrandMark, PennantMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
+import { getCurrentUser, homePathForRole } from "@/lib/session";
 
 const STEPS = [
   {
@@ -92,10 +93,12 @@ function MockIssueCard() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const user = await getCurrentUser();
+
   return (
     <div className="flex min-h-screen flex-col">
-      <TopNav />
+      <TopNav user={user ?? undefined} />
 
       <main className="flex-1">
         {/* Hero */}
@@ -114,12 +117,20 @@ export default function Home() {
               report to resolution.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" render={<Link href="/register" />}>
-                Report an issue
-              </Button>
-              <Button size="lg" variant="outline" render={<Link href="/login" />}>
-                Log in
-              </Button>
+              {user ? (
+                <Button size="lg" render={<Link href={homePathForRole(user.role)} />}>
+                  Go to your dashboard
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" render={<Link href="/register" />}>
+                    Report an issue
+                  </Button>
+                  <Button size="lg" variant="outline" render={<Link href="/login" />}>
+                    Log in
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
